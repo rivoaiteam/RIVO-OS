@@ -21,14 +21,10 @@ class LeadStatus(models.TextChoices):
     Allowed status values for Lead records.
 
     ACTIVE: Lead is being worked on
-    CONVERTED: Lead has been converted to a Client
     DECLINED: Lead was declined (no real intent)
-    NOT_PROCEEDING: Lead chose not to proceed
     """
     ACTIVE = 'active', 'Active'
-    CONVERTED = 'converted', 'Converted'
     DECLINED = 'declined', 'Declined'
-    NOT_PROCEEDING = 'not_proceeding', 'Not Proceeding'
 
 
 class Lead(AuditableModel):
@@ -205,9 +201,5 @@ class Lead(AuditableModel):
 
     @property
     def is_terminal(self) -> bool:
-        """Check if lead is in a terminal status."""
-        return self.status in [
-            LeadStatus.CONVERTED,
-            LeadStatus.DECLINED,
-            LeadStatus.NOT_PROCEEDING
-        ]
+        """Check if lead is in a terminal state (declined or converted)."""
+        return self.status == LeadStatus.DECLINED or self.converted_client_id is not None

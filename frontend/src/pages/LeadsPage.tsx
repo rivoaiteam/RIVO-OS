@@ -19,7 +19,6 @@ const STATUS_TABS: { value: LeadStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'active', label: 'Active' },
   { value: 'declined', label: 'Declined' },
-  { value: 'not_proceeding', label: 'Not Proceeding' },
 ]
 
 const DEFAULT_FILTERS = {
@@ -100,6 +99,22 @@ export function LeadsPage() {
       month: 'short',
       year: 'numeric',
     })
+  }
+
+  // Format time ago for last activity
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffDays > 0) return `${diffDays}d ago`
+    if (diffHours > 0) return `${diffHours}h ago`
+    if (diffMins > 0) return `${diffMins}m ago`
+    return 'Just now'
   }
 
   // Format SLA display from lead's sla_display field
@@ -198,17 +213,17 @@ export function LeadsPage() {
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="w-[25%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[28%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="w-[18%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                  Phone
-                </th>
-                <th className="w-[35%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[30%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Source
                 </th>
-                <th className="w-[22%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[21%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Created
+                </th>
+                <th className="w-[21%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Last Activity
                 </th>
               </tr>
             </thead>
@@ -220,6 +235,7 @@ export function LeadsPage() {
                   onClick={() => handleRowClick(lead)}
                   getSourceDisplay={getSourceDisplay}
                   formatCreatedAt={formatCreatedAt}
+                  formatTimeAgo={formatTimeAgo}
                   formatSlaDisplay={formatSlaDisplay}
                 />
               ))}
@@ -255,12 +271,14 @@ function LeadRow({
   onClick,
   getSourceDisplay,
   formatCreatedAt,
+  formatTimeAgo,
   formatSlaDisplay,
 }: {
   lead: LeadListItem
   onClick: () => void
   getSourceDisplay: (lead: LeadListItem) => string
   formatCreatedAt: (dateStr: string) => string
+  formatTimeAgo: (dateStr: string) => string
   formatSlaDisplay: (slaDisplay: string | null) => { text: string; isOverdue: boolean }
 }) {
   const slaDisplay = formatSlaDisplay(lead.sla_display)
@@ -284,15 +302,15 @@ function LeadRow({
         </div>
       </td>
       <td className="py-3">
-        <span className="text-xs text-gray-600">{lead.phone}</span>
-      </td>
-      <td className="py-3">
         <span className="text-xs text-gray-600 truncate block" title={getSourceDisplay(lead)}>
           {getSourceDisplay(lead)}
         </span>
       </td>
       <td className="py-3">
         <span className="text-xs text-gray-500">{formatCreatedAt(lead.created_at)}</span>
+      </td>
+      <td className="py-3">
+        <span className="text-xs text-gray-500">{formatTimeAgo(lead.updated_at)}</span>
       </td>
     </tr>
   )
