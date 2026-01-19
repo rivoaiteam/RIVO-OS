@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { AlertCircle, Loader2, Search, X, Plus } from 'lucide-react'
+import { AlertCircle, Loader2, Search, X } from 'lucide-react'
 import { useLeads } from '@/hooks/useLeads'
 import { useUrlFilters } from '@/hooks/useUrlState'
 import { LeadSidePanel } from '@/components/LeadSidePanel'
@@ -148,18 +148,9 @@ export function LeadsPage() {
     <div className="h-full">
       {/* Page Header */}
       <div className="px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-sm font-semibold text-gray-900">Leads</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Manage and convert incoming leads</p>
-          </div>
-          <button
-            onClick={() => setSelectedLeadId('new')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#1e3a5f] hover:bg-[#0f2744] rounded-lg transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New Lead
-          </button>
+        <div>
+          <h1 className="text-sm font-semibold text-gray-900">Leads</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Manage and convert incoming leads</p>
         </div>
 
         {/* Search and Status Tabs */}
