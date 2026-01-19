@@ -6,12 +6,9 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle, UserPlus } from 'lucide-react'
 import { useLead, useUpdateLead, useConvertLeadToClient, useChangeLeadStatus } from '@/hooks/useLeads'
-import { ActivityTimeline } from '@/components/activity'
 import { SLACountdown } from '@/components/SLACountdown'
 import type { LeadStatus } from '@/types/mortgage'
 import { cn } from '@/lib/utils'
-
-type TabType = 'details' | 'activity'
 
 const statusColors: Record<LeadStatus, string> = {
   active: 'bg-green-100 text-green-700',
@@ -28,9 +25,6 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
   const updateMutation = useUpdateLead()
   const convertMutation = useConvertLeadToClient()
   const changeStatusMutation = useChangeLeadStatus()
-
-  // Tab state
-  const [activeTab, setActiveTab] = useState<TabType>('details')
 
   // Local form state
   const [name, setName] = useState('')
@@ -174,31 +168,6 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
             </div>
           )}
 
-          {/* Tabs */}
-          <div className="flex mt-4 -mb-px">
-            <button
-              onClick={() => setActiveTab('details')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
-                activeTab === 'details'
-                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
-                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
-              )}
-            >
-              Details
-            </button>
-            <button
-              onClick={() => setActiveTab('activity')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
-                activeTab === 'activity'
-                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
-                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
-              )}
-            >
-              Activity
-            </button>
-          </div>
         </div>
 
         {/* Content */}
@@ -214,81 +183,69 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
               <p className="text-xs text-gray-400 mt-1">{error.message}</p>
             </div>
           ) : lead ? (
-            <>
-              {/* Details Tab */}
-              {activeTab === 'details' && (
-                <div className="space-y-6">
-                  {/* Save Error Toast */}
-                  {saveError && (
-                    <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs flex items-center gap-2">
-                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                      {saveError}
-                      <button
-                        onClick={() => setSaveError(null)}
-                        className="ml-auto text-red-400 hover:text-red-600"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Contact Information */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField label="Name *">
-                        <input
-                          type="text"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-                        />
-                      </FormField>
-                      <FormField label="Phone *">
-                        <input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-                        />
-                      </FormField>
-                      <FormField label="Email" className="col-span-2">
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="Optional"
-                          className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-                        />
-                      </FormField>
-                    </div>
-
-                    <FormField label="Intent">
-                      <textarea
-                        value={intent}
-                        onChange={(e) => setIntent(e.target.value)}
-                        placeholder="Lead's interest or requirements..."
-                        rows={3}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] resize-none"
-                      />
-                    </FormField>
-
-                    <FormField label="Source">
-                      <p className="text-sm text-gray-600">{getSourceDisplay()}</p>
-                    </FormField>
-                  </div>
+            <div className="space-y-4">
+              {/* Save Error Toast */}
+              {saveError && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs flex items-center gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                  {saveError}
+                  <button
+                    onClick={() => setSaveError(null)}
+                    className="ml-auto text-red-400 hover:text-red-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )}
 
-              {/* Activity Tab */}
-              {activeTab === 'activity' && (
-                <ActivityTimeline recordType="lead" recordId={leadId || ''} />
-              )}
-            </>
+              {/* Contact Information */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Name *">
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  />
+                </FormField>
+                <FormField label="Phone *">
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  />
+                </FormField>
+                <FormField label="Email" className="col-span-2">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Optional"
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                  />
+                </FormField>
+              </div>
+
+              <FormField label="Intent">
+                <textarea
+                  value={intent}
+                  onChange={(e) => setIntent(e.target.value)}
+                  placeholder="Lead's interest or requirements..."
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] resize-none"
+                />
+              </FormField>
+
+              <FormField label="Source">
+                <p className="text-sm text-gray-600">{getSourceDisplay()}</p>
+              </FormField>
+            </div>
           ) : null}
         </div>
 
         {/* Footer with Save and Convert buttons */}
-        {lead && !lead.converted_client && activeTab === 'details' && (
+        {lead && !lead.converted_client && (
           <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 space-y-2">
             <button
               onClick={handleSave}
