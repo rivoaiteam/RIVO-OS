@@ -161,9 +161,9 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
             </button>
           </div>
 
-          {/* SLA Display - Near top of panel */}
+          {/* SLA Countdown Section - Near top of panel */}
           {lead && lead.sla_timer && (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-3">
               <SLACountdown
                 status={lead.sla_timer.is_overdue ? 'overdue' : 'ok'}
                 remainingHours={lead.sla_timer.remaining_minutes != null ? lead.sla_timer.remaining_minutes / 60 : null}
@@ -232,30 +232,26 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
                     </div>
                   )}
 
-                  {/* Editable Fields */}
-                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Contact Information</h3>
+                  {/* Contact Information */}
+                  <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Name *</label>
+                      <FormField label="Name *">
                         <input
                           type="text"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                         />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Phone *</label>
+                      </FormField>
+                      <FormField label="Phone *">
                         <input
                           type="tel"
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                         />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                      </FormField>
+                      <FormField label="Email" className="col-span-2">
                         <input
                           type="email"
                           value={email}
@@ -263,26 +259,22 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
                           placeholder="Optional"
                           className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
                         />
-                      </div>
+                      </FormField>
                     </div>
-                  </div>
 
-                  {/* Intent */}
-                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Intent</h3>
-                    <textarea
-                      value={intent}
-                      onChange={(e) => setIntent(e.target.value)}
-                      placeholder="Lead's interest or requirements..."
-                      rows={3}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] resize-none"
-                    />
-                  </div>
+                    <FormField label="Intent">
+                      <textarea
+                        value={intent}
+                        onChange={(e) => setIntent(e.target.value)}
+                        placeholder="Lead's interest or requirements..."
+                        rows={3}
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] resize-none"
+                      />
+                    </FormField>
 
-                  {/* Source Info */}
-                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Source</h3>
-                    <p className="text-sm text-gray-600">{getSourceDisplay()}</p>
+                    <FormField label="Source">
+                      <p className="text-sm text-gray-600">{getSourceDisplay()}</p>
+                    </FormField>
                   </div>
                 </div>
               )}
@@ -335,5 +327,14 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
         )}
       </div>
     </>
+  )
+}
+
+function FormField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      {children}
+    </div>
   )
 }
