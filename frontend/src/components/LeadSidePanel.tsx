@@ -13,10 +13,8 @@ import { cn } from '@/lib/utils'
 type TabType = 'details' | 'activity'
 
 const statusColors: Record<LeadStatus, string> = {
-  active: 'bg-blue-100 text-blue-700',
-  converted: 'bg-green-100 text-green-700',
+  active: 'bg-green-100 text-green-700',
   declined: 'bg-red-100 text-red-700',
-  not_proceeding: 'bg-gray-200 text-gray-500',
 }
 
 interface LeadSidePanelProps {
@@ -156,16 +154,6 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
     })
   }
 
-  // Get SLA timer display from lead's sla_timer object
-  const getSlaDisplay = () => {
-    if (!lead?.sla_timer) return { text: '-', isOverdue: false }
-    if (!lead.sla_timer.display) return { text: 'No SLA', isOverdue: false }
-    return {
-      text: lead.sla_timer.display,
-      isOverdue: lead.sla_timer.is_overdue,
-    }
-  }
-
   if (!leadId) return null
 
   return (
@@ -183,17 +171,54 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h2 id="lead-panel-title" className="text-sm font-semibold text-gray-900">
-              {lead?.name || 'Lead Details'}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 id="lead-panel-title" className="text-lg font-semibold text-gray-900">
+                {lead?.name || 'Lead Details'}
+              </h2>
+              {lead && (
+                lead.converted_client ? (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-100 text-emerald-700">
+                    Converted
+                  </span>
+                ) : (
+                  <select
+                    value={status}
+                    onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
+                    disabled={changeStatusMutation.isPending}
+                    className={cn(
+                      'px-2 py-0.5 text-xs font-medium rounded border-0 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+                      statusColors[status]
+                    )}
+                  >
+                    <option value="active">Active</option>
+                    <option value="declined">Declined</option>
+                  </select>
+                )
+              )}
+            </div>
             <button
               onClick={onClose}
               className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               aria-label="Close panel"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </button>
           </div>
+
+          {/* SLA Display - Near top of panel */}
+          {lead && lead.sla_timer && (
+            <div className="mt-3">
+              <div className={cn(
+                'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium',
+                lead.sla_timer.is_overdue
+                  ? 'bg-red-50 text-red-700'
+                  : 'bg-green-50 text-green-700'
+              )}>
+                <span className="text-gray-500">SLA:</span>
+                <span>{lead.sla_timer.display || 'No SLA'}</span>
+              </div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="flex mt-4 -mb-px">
@@ -315,43 +340,10 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
                       <label className="block text-xs font-medium text-gray-400 mb-1.5">Created At</label>
                       <p className="text-sm text-gray-600">{formatCreatedAt(lead.created_at)}</p>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">SLA Timer</label>
-                      {(() => {
-                        const sla = getSlaDisplay()
-                        return (
-                          <p className={`text-sm font-medium ${sla.isOverdue ? 'text-red-600' : 'text-green-600'}`}>
-                            {sla.text}
-                          </p>
-                        )
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Status Dropdown */}
-                  <div className="pt-4 border-t border-gray-100">
-                    <label className="block text-xs font-medium text-gray-700 mb-1.5">Status</label>
-                    {lead.status === 'converted' ? (
-                      <span className={`inline-block px-3 py-1.5 text-xs font-medium rounded-lg ${statusColors['converted']}`}>
-                        Converted
-                      </span>
-                    ) : (
-                      <select
-                        value={status}
-                        onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
-                        disabled={changeStatusMutation.isPending}
-                        className={`h-8 px-3 text-xs font-medium rounded-lg border-0 focus:outline-none cursor-pointer disabled:opacity-50 ${statusColors[status]}`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="declined">Declined</option>
-                        <option value="not_proceeding">Not Proceeding</option>
-                      </select>
-                    )}
                   </div>
 
                   {/* Convert to Client Button */}
-                  {lead.status === 'active' && (
+                  {lead.status === 'active' && !lead.converted_client && (
                     <div className="pt-4 border-t border-gray-100">
                       <button
                         onClick={handleConvert}
