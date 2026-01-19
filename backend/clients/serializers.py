@@ -118,9 +118,10 @@ class ClientListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'phone', 'email', 'status',
             'application_type', 'dbr_available',
-            'sub_source', 'sla_display', 'active_case_id', 'created_at',
+            'sub_source', 'sla_display', 'active_case_id',
+            'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'dbr_available']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'dbr_available']
 
     def get_sla_display(self, obj: Client) -> str:
         """Get human-readable SLA timer display."""

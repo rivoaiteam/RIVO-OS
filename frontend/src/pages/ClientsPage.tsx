@@ -200,6 +200,22 @@ export function ClientsPage() {
     return `AED ${dbr.toLocaleString()}`
   }
 
+  // Format time ago for last activity
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffDays > 0) return `${diffDays}d ago`
+    if (diffHours > 0) return `${diffHours}h ago`
+    if (diffMins > 0) return `${diffMins}m ago`
+    return 'Just now'
+  }
+
   if (isLoading) {
     return (
       <div className="h-full bg-white flex items-center justify-center">
@@ -291,11 +307,12 @@ export function ClientsPage() {
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="w-[25%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                <th className="w-[25%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Source</th>
-                <th className="w-[18%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">DBR</th>
-                <th className="w-[18%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
-                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                <th className="w-[22%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                <th className="w-[20%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Source</th>
+                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">DBR</th>
+                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
+                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Last Activity</th>
+                <th className="w-[16%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -335,6 +352,11 @@ export function ClientsPage() {
                         month: 'short',
                         year: 'numeric',
                       })}
+                    </span>
+                  </td>
+                  <td className="py-3">
+                    <span className="text-xs text-gray-500">
+                      {formatTimeAgo(client.updated_at)}
                     </span>
                   </td>
                   <td className="py-3">

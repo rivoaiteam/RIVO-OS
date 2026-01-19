@@ -345,25 +345,22 @@ export function CasesPage() {
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[16%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Bank
                 </th>
-                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                  Case ID
-                </th>
-                <th className="w-[18%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[20%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Client
                 </th>
-                <th className="w-[16%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[18%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Stage
                 </th>
-                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[16%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Loan Amount
                 </th>
-                <th className="w-[12%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[16%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Created At
                 </th>
-                <th className="w-[12%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -398,9 +395,6 @@ export function CasesPage() {
                     ) : (
                       <span className="text-xs text-gray-400">-</span>
                     )}
-                  </td>
-                  <td className="py-3">
-                    <span className="text-xs font-mono text-gray-500">{caseItem.id.slice(0, 8)}</span>
                   </td>
                   <td className="py-3">
                     <span className="text-xs font-medium text-gray-900">{caseItem.client.name}</span>

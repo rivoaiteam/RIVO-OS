@@ -177,6 +177,7 @@ export interface ClientListItem {
   sla_display: string | null
   active_case_id: ClientCaseSummary[] | null
   created_at: string
+  updated_at: string
   // SLA status fields
   first_contact_sla_status?: SLAStatusData | null
   client_to_case_sla_status?: SLAStatusData | null
