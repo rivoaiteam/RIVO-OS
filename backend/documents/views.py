@@ -271,16 +271,26 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
         ).order_by('display_order', 'name')
 
         # Get uploaded documents for this client
-        uploaded_docs = {
-            (doc.document_type_id, doc.applicant_role): doc
-            for doc in self.get_queryset()
-        }
+        # Build lookups by both ID and NAME for cross-category matching
+        uploaded_docs_by_id = {}
+        uploaded_docs_by_name = {}
+        for doc in self.get_queryset():
+            uploaded_docs_by_id[(doc.document_type_id, doc.applicant_role)] = doc
+            # Use document type name for cross-category matching
+            doc_name = doc.document_type.name
+            uploaded_docs_by_name[(doc_name, doc.applicant_role)] = doc
 
         # Build checklist for primary applicant
         primary_checklist = []
+        matched_doc_names = set()  # Track which doc names have been matched
         for doc_type in document_types:
             if doc_type.applicant_type in ['primary', 'both']:
-                doc = uploaded_docs.get((doc_type.id, ApplicantRole.PRIMARY))
+                # Try exact ID match first, then name match (for cross-category)
+                doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY))
+                if not doc:
+                    doc = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.PRIMARY))
+                if doc:
+                    matched_doc_names.add((doc.document_type.name, ApplicantRole.PRIMARY))
                 primary_checklist.append({
                     'document_type': DocumentTypeSerializer(doc_type).data,
                     'document': ClientDocumentSerializer(doc).data if doc else None,
@@ -290,7 +300,11 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
         # Build conditional checklist
         conditional_checklist = []
         for doc_type in conditional_types:
-            doc = uploaded_docs.get((doc_type.id, ApplicantRole.PRIMARY))
+            doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY))
+            if not doc:
+                doc = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.PRIMARY))
+            if doc:
+                matched_doc_names.add((doc.document_type.name, ApplicantRole.PRIMARY))
             conditional_checklist.append({
                 'document_type': DocumentTypeSerializer(doc_type).data,
                 'document': ClientDocumentSerializer(doc).data if doc else None,
@@ -305,21 +319,23 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
             co_applicant_checklist = []
             for doc_type in document_types:
                 if doc_type.applicant_type in ['co_applicant', 'both']:
-                    doc = uploaded_docs.get((doc_type.id, ApplicantRole.CO_APPLICANT))
+                    doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.CO_APPLICANT))
+                    if not doc:
+                        doc = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.CO_APPLICANT))
+                    if doc:
+                        matched_doc_names.add((doc.document_type.name, ApplicantRole.CO_APPLICANT))
                     co_applicant_checklist.append({
                         'document_type': DocumentTypeSerializer(doc_type).data,
                         'document': ClientDocumentSerializer(doc).data if doc else None,
                         'is_uploaded': doc is not None,
                     })
 
-        # Get IDs of document types already shown in checklists
-        shown_type_ids = set(dt.id for dt in document_types) | set(dt.id for dt in conditional_types)
-
-        # Find uploaded documents that don't match current category
-        # (e.g., from before a profile change)
+        # Find uploaded documents that don't match any current requirement
+        # (e.g., category-specific docs from before a profile change)
         other_documents = []
-        for (doc_type_id, role), doc in uploaded_docs.items():
-            if doc_type_id not in shown_type_ids:
+        for (doc_type_id, role), doc in uploaded_docs_by_id.items():
+            doc_name = doc.document_type.name
+            if (doc_name, role) not in matched_doc_names:
                 other_documents.append({
                     'document_type': DocumentTypeSerializer(doc.document_type).data,
                     'document': ClientDocumentSerializer(doc).data,
