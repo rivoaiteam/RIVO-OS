@@ -67,6 +67,7 @@ const managerAnalytics: NavItem[] = [
 
 const mortgageSpecialistWorkspace: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['mortgage_specialist'], section: 'workspace' },
+  { id: 'leads', label: 'Leads', href: '/leads', icon: Users, roles: ['mortgage_specialist'], section: 'workspace' },
   { id: 'clients', label: 'Clients', href: '/clients', icon: UserCheck, roles: ['mortgage_specialist'], section: 'workspace' },
   { id: 'cases', label: 'Cases', href: '/cases', icon: Briefcase, roles: ['mortgage_specialist'], section: 'workspace' },
 ]
@@ -83,6 +84,8 @@ const mortgageSpecialistPayouts: NavItem[] = [
 
 const processExecutiveWorkspace: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['process_executive'], section: 'workspace' },
+  { id: 'leads', label: 'Leads', href: '/leads', icon: Users, roles: ['process_executive'], section: 'workspace' },
+  { id: 'clients', label: 'Clients', href: '/clients', icon: UserCheck, roles: ['process_executive'], section: 'workspace' },
   { id: 'cases', label: 'Cases', href: '/cases', icon: Briefcase, roles: ['process_executive'], section: 'workspace' },
 ]
 
