@@ -125,7 +125,7 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
         aria-labelledby="lead-panel-title"
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex-shrink-0">
+        <div className="px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <h2 id="lead-panel-title" className="text-lg font-semibold text-gray-900">
