@@ -4,14 +4,17 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, MessageCircle, AlertCircle, CheckCheck, Check, Clock } from 'lucide-react'
+import { Send, MessageCircle, AlertCircle, CheckCheck, Check, Clock, FileText } from 'lucide-react'
 import { useClientWhatsAppMessages, useSendWhatsAppMessage, type WhatsAppMessage } from '@/hooks/useWhatsApp'
 import { useWhatsAppWebSocket } from '@/hooks/useWhatsAppWebSocket'
+import { TemplateSelector } from './TemplateSelector'
+import type { ClientData } from '@/types/mortgage'
 import { cn } from '@/lib/utils'
 
 interface ClientWhatsAppTabProps {
   clientId: string
   clientPhone?: string
+  client?: Partial<ClientData>
 }
 
 function MessageBubble({ message }: { message: WhatsAppMessage }) {
@@ -83,8 +86,9 @@ function MessageBubble({ message }: { message: WhatsAppMessage }) {
   )
 }
 
-export function ClientWhatsAppTab({ clientId, clientPhone }: ClientWhatsAppTabProps) {
+export function ClientWhatsAppTab({ clientId, clientPhone, client }: ClientWhatsAppTabProps) {
   const [newMessage, setNewMessage] = useState('')
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -120,6 +124,11 @@ export function ClientWhatsAppTab({ clientId, clientPhone }: ClientWhatsAppTabPr
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const handleTemplateSelect = (content: string) => {
+    setNewMessage(content)
+    inputRef.current?.focus()
   }
 
   if (isLoading) {
@@ -176,6 +185,17 @@ export function ClientWhatsAppTab({ clientId, clientPhone }: ClientWhatsAppTabPr
       {/* Input Area */}
       <div className="pt-4 border-t border-gray-100">
         <div className="flex items-end gap-2">
+          <button
+            onClick={() => setShowTemplateSelector(true)}
+            className={cn(
+              'flex items-center justify-center w-11 h-11 rounded-full',
+              'border border-gray-200 text-gray-500',
+              'hover:bg-gray-50 hover:text-[#1e3a5f] hover:border-[#1e3a5f] transition-colors'
+            )}
+            title="Use Template"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
           <textarea
             ref={inputRef}
             value={newMessage}
@@ -217,6 +237,15 @@ export function ClientWhatsAppTab({ clientId, clientPhone }: ClientWhatsAppTabPr
           </p>
         )}
       </div>
+
+      {/* Template Selector Modal */}
+      {showTemplateSelector && (
+        <TemplateSelector
+          client={client || { phone: clientPhone }}
+          onSelect={handleTemplateSelect}
+          onClose={() => setShowTemplateSelector(false)}
+        />
+      )}
     </div>
   )
 }

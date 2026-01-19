@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/', include('documents.urls')),
     path('api/', include('audit.urls')),
     path('api/whatsapp/', include('whatsapp.urls')),
+    path('api/', include('templates_app.urls')),
 ]

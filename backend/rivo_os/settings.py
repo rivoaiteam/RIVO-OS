@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'documents',
     'audit',
     'whatsapp',
+    'templates_app',
 ]
 
 MIDDLEWARE = [

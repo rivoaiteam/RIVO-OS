@@ -4,6 +4,7 @@ import { UserCog, Radio, Building2, FileText, Clock, Loader2 } from 'lucide-reac
 import { PageHeader } from '@/components/layout/PageHeader'
 import { cn } from '@/lib/utils'
 import { useStageSLAConfigs, useUpdateStageSLAConfig, useClientToCaseSLAConfig, useUpdateClientToCaseSLAConfig } from '@/hooks/useCases'
+import { TemplateList } from '@/components/templates/TemplateList'
 
 const settingsSections = [
   { id: 'users', label: 'Users & Roles', href: '/settings/users', icon: UserCog },
@@ -96,12 +97,7 @@ export function BankProductsSettingsPage() {
 }
 
 export function TemplatesSettingsPage() {
-  return (
-    <div>
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Templates</h2>
-      <p className="text-gray-500">Manage message and document templates.</p>
-    </div>
-  )
+  return <TemplateList />
 }
 
 export function SLASettingsPage() {
