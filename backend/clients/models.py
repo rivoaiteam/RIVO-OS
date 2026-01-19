@@ -27,6 +27,7 @@ class ClientStatus(models.TextChoices):
 
 class ResidencyType(models.TextChoices):
     """Residency type choices."""
+    UAE_NATIONAL = 'uae_national', 'UAE National'
     UAE_RESIDENT = 'uae_resident', 'UAE Resident'
     NON_RESIDENT = 'non_resident', 'Non-Resident'
 

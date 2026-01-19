@@ -20,8 +20,10 @@ from documents.models import (
     ClientDocument,
     CaseDocument,
     DocumentLevel,
+    DocumentCategory,
     ApplicantRole,
 )
+from clients.models import ResidencyType, EmploymentType
 from documents.serializers import (
     DocumentTypeSerializer,
     DocumentTypeCreateSerializer,
@@ -34,6 +36,32 @@ from documents.storage import upload_file, delete_file
 from users.permissions import IsAuthenticated
 
 logger = logging.getLogger(__name__)
+
+
+def get_client_document_category(client):
+    """
+    Determine document category based on client's employment type and residency.
+
+    Returns the appropriate DocumentCategory value.
+    """
+    employment = client.employment_type
+    residency = client.residency
+
+    if residency == ResidencyType.UAE_NATIONAL:
+        if employment == EmploymentType.SALARIED:
+            return DocumentCategory.SALARIED_UAE_NATIONAL
+        else:
+            return DocumentCategory.SELF_EMPLOYED_UAE_NATIONAL
+    elif residency == ResidencyType.UAE_RESIDENT:
+        if employment == EmploymentType.SALARIED:
+            return DocumentCategory.SALARIED_UAE_RESIDENT
+        else:
+            return DocumentCategory.SELF_EMPLOYED_UAE_RESIDENT
+    else:  # NON_RESIDENT
+        if employment == EmploymentType.SALARIED:
+            return DocumentCategory.SALARIED_NON_RESIDENT
+        else:
+            return DocumentCategory.SELF_EMPLOYED_NON_RESIDENT
 
 
 @api_view(['POST'])
@@ -222,12 +250,24 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
             - primary: List of document types with upload status for primary applicant
             - co_applicant: List for co-applicant (if joint application)
             - is_joint_application: Boolean
+            - category: The document category based on client profile
+            - conditional: List of conditional documents
         """
         client = self.get_client()
 
-        # Get all client-level document types
+        # Get document category based on client's profile
+        category = get_client_document_category(client)
+
+        # Get client-level document types for this category
         document_types = DocumentType.objects.filter(
-            level=DocumentLevel.CLIENT
+            level=DocumentLevel.CLIENT,
+            category=category
+        ).order_by('display_order', 'name')
+
+        # Get conditional documents (client-level)
+        conditional_types = DocumentType.objects.filter(
+            level=DocumentLevel.CLIENT,
+            category=DocumentCategory.CONDITIONAL
         ).order_by('display_order', 'name')
 
         # Get uploaded documents for this client
@@ -236,7 +276,7 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
             for doc in self.get_queryset()
         }
 
-        # Build checklist for primary applicant (only primary and both)
+        # Build checklist for primary applicant
         primary_checklist = []
         for doc_type in document_types:
             if doc_type.applicant_type in ['primary', 'both']:
@@ -246,6 +286,16 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
                     'document': ClientDocumentSerializer(doc).data if doc else None,
                     'is_uploaded': doc is not None,
                 })
+
+        # Build conditional checklist
+        conditional_checklist = []
+        for doc_type in conditional_types:
+            doc = uploaded_docs.get((doc_type.id, ApplicantRole.PRIMARY))
+            conditional_checklist.append({
+                'document_type': DocumentTypeSerializer(doc_type).data,
+                'document': ClientDocumentSerializer(doc).data if doc else None,
+                'is_uploaded': doc is not None,
+            })
 
         # Build checklist for co-applicant (if joint application)
         co_applicant_checklist = None
@@ -262,10 +312,27 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
                         'is_uploaded': doc is not None,
                     })
 
+        # Get IDs of document types already shown in checklists
+        shown_type_ids = set(dt.id for dt in document_types) | set(dt.id for dt in conditional_types)
+
+        # Find uploaded documents that don't match current category
+        # (e.g., from before a profile change)
+        other_documents = []
+        for (doc_type_id, role), doc in uploaded_docs.items():
+            if doc_type_id not in shown_type_ids:
+                other_documents.append({
+                    'document_type': DocumentTypeSerializer(doc.document_type).data,
+                    'document': ClientDocumentSerializer(doc).data,
+                    'is_uploaded': True,
+                })
+
         return Response({
             'primary': primary_checklist,
             'co_applicant': co_applicant_checklist,
+            'conditional': conditional_checklist,
+            'other_documents': other_documents,  # Docs from previous profile
             'is_joint_application': is_joint,
+            'category': category,
         })
 
     def retrieve(self, request, client_id=None, pk=None):

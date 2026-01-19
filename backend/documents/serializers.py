@@ -34,6 +34,8 @@ class DocumentTypeSerializer(serializers.ModelSerializer):
             'id',
             'name',
             'level',
+            'category',
+            'condition',
             'required',
             'description',
             'applicant_type',

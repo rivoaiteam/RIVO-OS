@@ -25,6 +25,17 @@ class DocumentLevel(models.TextChoices):
     CASE = 'case', 'Case'
 
 
+class DocumentCategory(models.TextChoices):
+    """Document category based on employment type and residency."""
+    SALARIED_UAE_NATIONAL = 'salaried_uae_national', 'Salaried - UAE National'
+    SELF_EMPLOYED_UAE_NATIONAL = 'self_employed_uae_national', 'Self-Employed - UAE National'
+    SALARIED_UAE_RESIDENT = 'salaried_uae_resident', 'Salaried - UAE Resident'
+    SELF_EMPLOYED_UAE_RESIDENT = 'self_employed_uae_resident', 'Self-Employed - UAE Resident'
+    SALARIED_NON_RESIDENT = 'salaried_non_resident', 'Salaried - Non-Resident'
+    SELF_EMPLOYED_NON_RESIDENT = 'self_employed_non_resident', 'Self-Employed - Non-Resident'
+    CONDITIONAL = 'conditional', 'Conditional'
+
+
 class ApplicantType(models.TextChoices):
     """Applicant type choices for document requirements."""
     PRIMARY = 'primary', 'Primary'
@@ -76,6 +87,21 @@ class DocumentType(models.Model):
         help_text='Document level (client or case)'
     )
 
+    category = models.CharField(
+        max_length=30,
+        choices=DocumentCategory.choices,
+        blank=True,
+        default='',
+        help_text='Document category based on employment/residency type'
+    )
+
+    condition = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Condition when this document is required (for conditional documents)'
+    )
+
     required = models.BooleanField(
         default=False,
         help_text='Whether this document is required'
@@ -123,8 +149,8 @@ class DocumentType(models.Model):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=['name', 'level'],
-                name='document_types_name_level_unique'
+                fields=['name', 'level', 'category'],
+                name='document_types_name_level_category_unique'
             )
         ]
 
