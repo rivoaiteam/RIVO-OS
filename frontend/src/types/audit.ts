@@ -1,0 +1,177 @@
+/**
+ * TypeScript types for Audit, Notes, and Reminders.
+ * These types correspond to the backend Django models and API responses.
+ */
+
+// Enums
+
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE'
+
+export type ReminderStatus = 'pending' | 'completed' | 'dismissed'
+
+export type NotableType = 'client' | 'case' | 'lead'
+
+export type ActionType = 'note' | 'document' | 'record' | 'reminder' | 'system'
+
+// User Summary
+
+export interface UserSummary {
+  id: string
+  name: string
+  email: string
+}
+
+// Reminder Types
+
+export interface ReminderData {
+  id: string
+  reminder_date: string
+  reminder_time: string | null
+  status: ReminderStatus
+  completed_at: string | null
+  is_overdue: boolean
+  is_due_today: boolean
+  created_at: string
+  updated_at: string
+}
+
+// Note Types
+
+export interface NoteData {
+  id: string
+  text: string
+  notable_type: NotableType
+  notable_id: string
+  author: UserSummary | null
+  reminder: ReminderData | null
+  is_editable: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateNoteData {
+  text: string
+  reminder_date?: string | null
+  reminder_time?: string | null
+}
+
+export interface UpdateNoteData {
+  text?: string
+  reminder_date?: string | null
+  reminder_time?: string | null
+}
+
+// Activity Timeline Types
+
+export interface ActivityTimelineEntry {
+  id: string
+  timestamp: string
+  time_display: string
+  user_name: string
+  action_summary: string
+  action_type: ActionType
+  entry_type: AuditAction
+  record_type: string | null
+  record_id: string | null
+}
+
+export interface ActivityTimelineGroup {
+  date: string
+  date_display: string
+  entries: ActivityTimelineEntry[]
+}
+
+// Audit Log Types (Admin view)
+
+export interface AuditLogEntry {
+  id: string
+  table_name: string
+  record_id: string
+  action: AuditAction
+  user_id: string | null
+  user_name: string
+  timestamp: string
+  changes: Record<string, unknown>
+  metadata: Record<string, unknown>
+}
+
+export interface AuditLogExportParams {
+  format: 'csv' | 'json'
+  reason: string
+  date_from?: string
+  date_to?: string
+  table_name?: string
+  action?: AuditAction
+  user_id?: string
+}
+
+// Dashboard Reminder Types
+
+export interface DashboardReminder {
+  id: string
+  note_id: string
+  note_text: string
+  notable_type: NotableType
+  notable_id: string
+  notable_name: string
+  reminder_date: string
+  reminder_time: string | null
+  status: ReminderStatus
+  is_overdue: boolean
+  is_due_today: boolean
+  author_name: string
+  created_at: string
+}
+
+// Query Params
+
+export interface AuditLogQueryParams {
+  page?: number
+  page_size?: number
+  date_from?: string
+  date_to?: string
+  table_name?: string
+  action?: AuditAction
+  user_id?: string
+  record_id?: string
+}
+
+// Paginated Response (reuse from mortgage types or define here)
+
+export interface PaginatedAuditLogs {
+  items: AuditLogEntry[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+// Display labels
+
+export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  CREATE: 'Created',
+  UPDATE: 'Updated',
+  DELETE: 'Deleted',
+}
+
+export const REMINDER_STATUS_LABELS: Record<ReminderStatus, string> = {
+  pending: 'Pending',
+  completed: 'Completed',
+  dismissed: 'Dismissed',
+}
+
+export const TABLE_NAME_LABELS: Record<string, string> = {
+  clients: 'Clients',
+  cases: 'Cases',
+  leads: 'Leads',
+  notes: 'Notes',
+  reminders: 'Reminders',
+  client_documents: 'Client Documents',
+  case_documents: 'Case Documents',
+  audit_logs: 'Audit Logs',
+  channels: 'Channels',
+  sources: 'Sources',
+  sub_sources: 'Sub-Sources',
+  users: 'Users',
+  document_types: 'Document Types',
+}

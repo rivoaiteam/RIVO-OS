@@ -1,0 +1,16 @@
+<svg viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Icon - House with R -->
+  <g>
+    <!-- Outer house frame -->
+    <path d="M25 50V25L40 12L55 25V50" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <!-- Inner diagonal lines forming R -->
+    <path d="M25 50L40 35" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M40 35L40 50" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Roof peak line -->
+    <path d="M40 12V5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- Text "Rivo" -->
+  <text x="70" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="currentColor">Rivo</text>
+  <!-- TM -->
+  <text x="142" y="22" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="currentColor">TM</text>
+</svg>

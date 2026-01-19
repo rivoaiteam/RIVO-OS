@@ -1,0 +1,855 @@
+/**
+ * ClientSidePanel - Unified panel for creating and editing clients.
+ * Same UI for both create and edit modes.
+ * Includes tabs for Details, Documents, and Activity.
+ */
+
+import { useState, useEffect, useMemo } from 'react'
+import { X, AlertCircle, Loader2, Briefcase } from 'lucide-react'
+import {
+  useClient,
+  useCreateClient,
+  useUpdateClient,
+  useUpdateCoApplicant,
+  useChangeClientStatus,
+} from '@/hooks/useClients'
+import { CaseSidePanel } from '@/components/CaseSidePanel'
+import { ClientDocumentTab } from '@/components/documents'
+import { ActivityTimeline } from '@/components/activity'
+import { SLACountdown } from '@/components/SLACountdown'
+import { useChannels, type Channel } from '@/hooks/useChannels'
+import { useAuth } from '@/contexts/AuthContext'
+import { api } from '@/lib/api'
+import type {
+  ResidencyType,
+  EmploymentType,
+  ClientStatus,
+  SLAStatusValue,
+} from '@/types/mortgage'
+import { cn } from '@/lib/utils'
+
+interface ClientSidePanelProps {
+  clientId: string
+  onClose: () => void
+  hideCreateCase?: boolean
+  viewOnly?: boolean
+}
+
+type TabType = 'details' | 'documents' | 'activity'
+
+const statusColors: Record<ClientStatus, string> = {
+  active: 'bg-green-100 text-green-700',
+  converted: 'bg-emerald-100 text-emerald-700',
+  declined: 'bg-red-100 text-red-700',
+  not_proceeding: 'bg-gray-200 text-gray-500',
+}
+
+const residencyOptions: { value: ResidencyType; label: string }[] = [
+  { value: 'uae_national', label: 'UAE National' },
+  { value: 'uae_resident', label: 'UAE Resident' },
+  { value: 'non_resident', label: 'Non-Resident' },
+]
+
+const employmentOptions: { value: EmploymentType; label: string }[] = [
+  { value: 'salaried', label: 'Salaried' },
+  { value: 'self_employed', label: 'Self Employed' },
+]
+
+const UAE_BANKS = [
+  'ADCB', 'ADIB', 'CBD', 'CBI', 'DIB', 'Emirates NBD', 'FAB',
+  'Mashreq', 'RAKBANK', 'Standard Chartered', 'HSBC', 'Citibank', 'Other',
+]
+
+const COUNTRY_CODES = [
+  { code: '+971', label: 'UAE (+971)' },
+  { code: '+91', label: 'India (+91)' },
+  { code: '+44', label: 'UK (+44)' },
+  { code: '+1', label: 'USA (+1)' },
+  { code: '+92', label: 'Pakistan (+92)' },
+  { code: '+63', label: 'Philippines (+63)' },
+  { code: '+20', label: 'Egypt (+20)' },
+  { code: '+966', label: 'Saudi (+966)' },
+  { code: '+965', label: 'Kuwait (+965)' },
+  { code: '+974', label: 'Qatar (+974)' },
+  { code: '+973', label: 'Bahrain (+973)' },
+  { code: '+968', label: 'Oman (+968)' },
+  { code: '+962', label: 'Jordan (+962)' },
+  { code: '+961', label: 'Lebanon (+961)' },
+  { code: '+86', label: 'China (+86)' },
+  { code: '+49', label: 'Germany (+49)' },
+  { code: '+33', label: 'France (+33)' },
+  { code: '+61', label: 'Australia (+61)' },
+  { code: '+27', label: 'South Africa (+27)' },
+]
+
+const NATIONALITY_OPTIONS = [
+  'Afghan', 'Albanian', 'Algerian', 'American', 'Andorran', 'Angolan', 'Argentine', 'Armenian',
+  'Australian', 'Austrian', 'Azerbaijani', 'Bahraini', 'Bangladeshi', 'Belarusian', 'Belgian',
+  'Bolivian', 'Bosnian', 'Brazilian', 'British', 'Bulgarian', 'Cambodian', 'Cameroonian',
+  'Canadian', 'Chilean', 'Chinese', 'Colombian', 'Congolese', 'Costa Rican', 'Croatian', 'Cuban',
+  'Cypriot', 'Czech', 'Danish', 'Dominican', 'Dutch', 'Ecuadorian', 'Egyptian', 'Emirati',
+  'Eritrean', 'Estonian', 'Ethiopian', 'Filipino', 'Finnish', 'French', 'Georgian', 'German',
+  'Ghanaian', 'Greek', 'Guatemalan', 'Haitian', 'Honduran', 'Hungarian', 'Icelandic', 'Indian',
+  'Indonesian', 'Iranian', 'Iraqi', 'Irish', 'Israeli', 'Italian', 'Ivorian', 'Jamaican',
+  'Japanese', 'Jordanian', 'Kazakh', 'Kenyan', 'Korean (North)', 'Korean (South)', 'Kuwaiti',
+  'Kyrgyz', 'Laotian', 'Latvian', 'Lebanese', 'Libyan', 'Lithuanian', 'Luxembourgish',
+  'Macedonian', 'Malaysian', 'Maldivian', 'Maltese', 'Mauritanian', 'Mauritian', 'Mexican',
+  'Moldovan', 'Mongolian', 'Montenegrin', 'Moroccan', 'Mozambican', 'Myanmar', 'Namibian',
+  'Nepalese', 'New Zealander', 'Nicaraguan', 'Nigerian', 'Norwegian', 'Omani', 'Pakistani',
+  'Palestinian', 'Panamanian', 'Paraguayan', 'Peruvian', 'Polish', 'Portuguese', 'Qatari',
+  'Romanian', 'Russian', 'Rwandan', 'Saudi', 'Senegalese', 'Serbian', 'Singaporean', 'Slovak',
+  'Slovenian', 'Somali', 'South African', 'Spanish', 'Sri Lankan', 'Sudanese', 'Swedish',
+  'Swiss', 'Syrian', 'Taiwanese', 'Tajik', 'Tanzanian', 'Thai', 'Tunisian', 'Turkish', 'Turkmen',
+  'Ugandan', 'Ukrainian', 'Uruguayan', 'Uzbek', 'Venezuelan', 'Vietnamese', 'Yemeni', 'Zambian',
+  'Zimbabwean',
+]
+
+export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: viewOnlyProp }: ClientSidePanelProps) {
+  const { user } = useAuth()
+  const isCreateMode = clientId === 'new'
+  const { data: client, isLoading, error } = useClient(clientId)
+
+  // Managers have read-only access
+  const viewOnly = viewOnlyProp || user?.role === 'manager'
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<TabType>('details')
+
+  // Form state
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+971')
+  const [phone, setPhone] = useState('')
+  const [dob, setDob] = useState('')
+  const [nationality, setNationality] = useState('')
+  const [residency, setResidency] = useState<ResidencyType>('uae_resident')
+  const [employmentType, setEmploymentType] = useState<EmploymentType>('salaried')
+  const [subSourceId, setSubSourceId] = useState('')
+  const [applicationType, setApplicationType] = useState<'single' | 'joint'>('single')
+  const [monthlySalary, setMonthlySalary] = useState('')
+  const [totalAddbacks, setTotalAddbacks] = useState('')
+
+  // Co-borrower fields
+  const [coBorrowerFirstName, setCoBorrowerFirstName] = useState('')
+  const [coBorrowerLastName, setCoBorrowerLastName] = useState('')
+  const [coBorrowerPhoneCountryCode, setCoBorrowerPhoneCountryCode] = useState('+971')
+  const [coBorrowerPhone, setCoBorrowerPhone] = useState('')
+  const [coBorrowerEmail, setCoBorrowerEmail] = useState('')
+  const [coBorrowerSalary, setCoBorrowerSalary] = useState('')
+
+  // Liabilities
+  const [liabilities, setLiabilities] = useState<{ type: string; amount: string; bankName?: string }[]>([])
+
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [showCaseCreation, setShowCaseCreation] = useState(false)
+  const [_hasChanges, _setHasChanges] = useState(false)
+  const [initialLoadDone, setInitialLoadDone] = useState(false)
+
+  const createMutation = useCreateClient()
+  const updateMutation = useUpdateClient()
+  const updateCoApplicantMutation = useUpdateCoApplicant()
+  const changeStatusMutation = useChangeClientStatus()
+
+  // Initialize form with client data for edit mode
+  useEffect(() => {
+    if (client) {
+      const nameParts = client.name.split(' ')
+      setFirstName(nameParts[0] || '')
+      setLastName(nameParts.slice(1).join(' ') || '')
+      setEmail(client.email || '')
+      // Parse phone to extract country code
+      const phoneValue = client.phone || ''
+      const matchingCode = COUNTRY_CODES.find(c => phoneValue.startsWith(c.code))
+      if (matchingCode) {
+        setPhoneCountryCode(matchingCode.code)
+        setPhone(phoneValue.slice(matchingCode.code.length).trim())
+      } else {
+        setPhone(phoneValue)
+      }
+      setDob(client.date_of_birth || '')
+      setNationality(client.nationality || '')
+      setResidency(client.residency || 'uae_resident')
+      setEmploymentType(client.employment_type || 'salaried')
+      setApplicationType(client.application_type || 'single')
+      setMonthlySalary(client.monthly_salary || '')
+      setTotalAddbacks(client.total_addbacks || '')
+      setSubSourceId(client.sub_source?.id || '')
+
+      // Build liabilities from client data
+      const clientLiabilities: { type: string; amount: string; bankName?: string }[] = []
+      if (client.cc_1_limit) clientLiabilities.push({ type: 'cc', amount: client.cc_1_limit, bankName: '' })
+      if (client.cc_2_limit) clientLiabilities.push({ type: 'cc', amount: client.cc_2_limit, bankName: '' })
+      if (client.cc_3_limit) clientLiabilities.push({ type: 'cc', amount: client.cc_3_limit, bankName: '' })
+      if (client.cc_4_limit) clientLiabilities.push({ type: 'cc', amount: client.cc_4_limit, bankName: '' })
+      if (client.cc_5_limit) clientLiabilities.push({ type: 'cc', amount: client.cc_5_limit, bankName: '' })
+      if (client.auto_loan_emi) clientLiabilities.push({ type: 'auto', amount: client.auto_loan_emi })
+      if (client.personal_loan_emi) clientLiabilities.push({ type: 'personal', amount: client.personal_loan_emi })
+      if (client.existing_mortgage_emi) clientLiabilities.push({ type: 'mortgage', amount: client.existing_mortgage_emi })
+      setLiabilities(clientLiabilities)
+
+      // Co-applicant
+      if (client.co_applicant) {
+        const coNameParts = client.co_applicant.name.split(' ')
+        setCoBorrowerFirstName(coNameParts[0] || '')
+        setCoBorrowerLastName(coNameParts.slice(1).join(' ') || '')
+        // Parse co-borrower phone
+        const coPhoneValue = client.co_applicant.phone || ''
+        const coMatchingCode = COUNTRY_CODES.find(c => coPhoneValue.startsWith(c.code))
+        if (coMatchingCode) {
+          setCoBorrowerPhoneCountryCode(coMatchingCode.code)
+          setCoBorrowerPhone(coPhoneValue.slice(coMatchingCode.code.length).trim())
+        } else {
+          setCoBorrowerPhone(coPhoneValue)
+        }
+        setCoBorrowerEmail(client.co_applicant.email || '')
+        setCoBorrowerSalary(client.co_applicant.monthly_salary || '')
+      }
+      // Mark initial load as done (with slight delay to avoid immediate change detection)
+      setTimeout(() => setInitialLoadDone(true), 100)
+    }
+  }, [client])
+
+  // Track changes for edit mode
+  useEffect(() => {
+    if (initialLoadDone && !isCreateMode) {
+      _setHasChanges(true)
+    }
+  }, [firstName, lastName, email, phone, phoneCountryCode, dob, nationality, residency, employmentType, applicationType, monthlySalary, totalAddbacks, liabilities, coBorrowerFirstName, coBorrowerLastName, coBorrowerPhone, coBorrowerPhoneCountryCode, coBorrowerEmail, coBorrowerSalary, initialLoadDone, isCreateMode])
+
+  // Sanitize amount input
+  const sanitizeAmount = (value: string): string => {
+    const cleaned = value.replace(/[^0-9.]/g, '')
+    const parts = cleaned.split('.')
+    if (parts.length > 2) return parts[0] + '.' + parts.slice(1).join('')
+    return cleaned
+  }
+
+  const addLiability = () => {
+    if (liabilities.length < 10) {
+      setLiabilities([...liabilities, { type: 'cc', amount: '', bankName: '' }])
+    }
+  }
+
+  const removeLiability = (index: number) => {
+    setLiabilities(liabilities.filter((_, i) => i !== index))
+  }
+
+  const updateLiability = (index: number, field: 'type' | 'amount' | 'bankName', value: string) => {
+    const updated = [...liabilities]
+    if (field === 'bankName') {
+      updated[index].bankName = value
+    } else {
+      updated[index][field] = value
+    }
+    setLiabilities(updated)
+  }
+
+  // Calculations - DBR and Max Loan Amount only (LTV is calculated in Case)
+  const calculations = useMemo(() => {
+    const salary = parseFloat(monthlySalary) || 0
+    const addbacks = parseFloat(totalAddbacks) || 0
+    const coSalary = applicationType === 'joint' ? (parseFloat(coBorrowerSalary) || 0) : 0
+    const totalIncome = salary + addbacks + coSalary
+
+    const ccLiability = liabilities
+      .filter(l => l.type === 'cc')
+      .reduce((sum, l) => sum + (parseFloat(l.amount) || 0) * 0.05, 0)
+
+    const loanEMIs = liabilities
+      .filter(l => l.type !== 'cc')
+      .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0)
+
+    const totalLiab = ccLiability + loanEMIs
+    const dbrAvailable = totalIncome / 2 - totalLiab
+    const maxLoanAmount = totalIncome * 68
+
+    return {
+      totalLiabilities: Math.round(totalLiab * 100) / 100,
+      dbrAvailable: Math.round(dbrAvailable * 100) / 100,
+      maxLoanAmount: Math.round(maxLoanAmount * 100) / 100,
+    }
+  }, [monthlySalary, totalAddbacks, coBorrowerSalary, applicationType, liabilities])
+
+  const handleSave = async () => {
+    const errors: string[] = []
+
+    // Personal Information
+    if (!firstName.trim()) errors.push('First Name is required')
+    if (!lastName.trim()) errors.push('Last Name is required')
+    if (!phone.trim()) errors.push('Phone Number is required')
+    else if (!/^[0-9]{7,12}$/.test(phone.replace(/[\s-]/g, ''))) errors.push('Invalid phone format (7-12 digits)')
+    if (!email.trim()) errors.push('Email is required')
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.push('Invalid email format')
+    if (!dob) errors.push('Date of Birth is required')
+    if (!nationality) errors.push('Nationality is required')
+    if (!residency) errors.push('Residency is required')
+    if (!employmentType) errors.push('Employment is required')
+    if (!subSourceId && isCreateMode) errors.push('Source is required')
+
+    // Income
+    if (!monthlySalary) errors.push('Monthly Salary is required')
+
+    // Co-borrower (if joint)
+    if (applicationType === 'joint') {
+      if (!coBorrowerFirstName.trim()) errors.push('Co-borrower First Name is required')
+      if (!coBorrowerLastName.trim()) errors.push('Co-borrower Last Name is required')
+      if (!coBorrowerPhone.trim()) errors.push('Co-borrower Phone is required')
+      else if (!/^[0-9]{7,12}$/.test(coBorrowerPhone.replace(/[\s-]/g, ''))) errors.push('Invalid co-borrower phone format')
+      if (!coBorrowerEmail.trim()) errors.push('Co-borrower Email is required')
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(coBorrowerEmail.trim())) errors.push('Invalid co-borrower email format')
+      if (!coBorrowerSalary) errors.push('Co-borrower Monthly Salary is required')
+    }
+
+    if (errors.length > 0) {
+      setSaveError(errors[0])
+      return
+    }
+
+    const fullName = lastName.trim() ? `${firstName.trim()} ${lastName.trim()}` : firstName.trim()
+    const fullPhone = `${phoneCountryCode}${phone.trim()}`
+    const ccLimits = liabilities.filter(l => l.type === 'cc').map(l => l.amount)
+    const autoLoan = liabilities.find(l => l.type === 'auto')?.amount
+    const personalLoan = liabilities.find(l => l.type === 'personal')?.amount
+    const mortgageEmi = liabilities.find(l => l.type === 'mortgage')?.amount
+
+    const data: Record<string, any> = {
+      name: fullName,
+      phone: fullPhone,
+      email: email.trim() || undefined,
+      date_of_birth: dob || undefined,
+      nationality: nationality || undefined,
+      residency,
+      employment_type: employmentType,
+      application_type: applicationType,
+      monthly_salary: monthlySalary || undefined,
+      total_addbacks: totalAddbacks || undefined,
+      cc_1_limit: ccLimits[0] || undefined,
+      cc_2_limit: ccLimits[1] || undefined,
+      cc_3_limit: ccLimits[2] || undefined,
+      cc_4_limit: ccLimits[3] || undefined,
+      cc_5_limit: ccLimits[4] || undefined,
+      auto_loan_emi: autoLoan || undefined,
+      personal_loan_emi: personalLoan || undefined,
+      existing_mortgage_emi: mortgageEmi || undefined,
+      sub_source_id: subSourceId || undefined,
+    }
+
+    try {
+      let savedClientId = clientId
+
+      if (isCreateMode) {
+        const newClient = await createMutation.mutateAsync(data as any)
+        savedClientId = newClient.id
+      } else {
+        await updateMutation.mutateAsync({ id: clientId, data })
+      }
+
+      // Save co-applicant data via separate endpoint for joint applications
+      if (applicationType === 'joint' && savedClientId && savedClientId !== 'new') {
+        const coFullName = coBorrowerLastName.trim()
+          ? `${coBorrowerFirstName.trim()} ${coBorrowerLastName.trim()}`
+          : coBorrowerFirstName.trim()
+        const coFullPhone = `${coBorrowerPhoneCountryCode}${coBorrowerPhone.trim()}`
+
+        await updateCoApplicantMutation.mutateAsync({
+          clientId: savedClientId,
+          data: {
+            name: coFullName,
+            phone: coFullPhone,
+            email: coBorrowerEmail.trim() || undefined,
+            monthly_salary: coBorrowerSalary || undefined,
+          },
+        })
+      }
+
+      onClose()
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save client')
+    }
+  }
+
+  const handleStatusChange = async (newStatus: ClientStatus) => {
+    if (!client) return
+    try {
+      await changeStatusMutation.mutateAsync({ id: clientId, status: newStatus })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to change status')
+    }
+  }
+
+  const handleConvertToCase = () => {
+    setShowCaseCreation(true)
+  }
+
+  const handleCasePanelClose = () => {
+    setShowCaseCreation(false)
+    // After case is created, close the client panel too
+    onClose()
+  }
+
+  if (!isCreateMode && isLoading) {
+    return (
+      <SidePanelWrapper onClose={onClose}>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+        </div>
+      </SidePanelWrapper>
+    )
+  }
+
+  if (!isCreateMode && error) {
+    return (
+      <SidePanelWrapper onClose={onClose}>
+        <div className="flex flex-col items-center justify-center h-64">
+          <AlertCircle className="h-12 w-12 text-red-400 mb-4" />
+          <p className="text-gray-600">Failed to load client</p>
+        </div>
+      </SidePanelWrapper>
+    )
+  }
+
+  const isPending = createMutation.isPending || updateMutation.isPending || updateCoApplicantMutation.isPending
+
+  // Check if we should show SLA countdowns (only in edit mode with client data)
+  const showSLACountdowns = !isCreateMode && client
+  const firstContactSLA = client?.first_contact_sla_status
+  const clientToCaseSLA = client?.client_to_case_sla_status
+
+  return (
+    <SidePanelWrapper onClose={onClose}>
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-white px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {isCreateMode ? 'New Client' : (client?.name || 'Edit Client')}
+            </h2>
+            {!isCreateMode && client && (
+              client.status === 'converted' ? (
+                <span className={cn('px-2 py-0.5 text-xs font-medium rounded', statusColors[client.status])}>
+                  Converted
+                </span>
+              ) : (
+                <select
+                  value={client.status}
+                  onChange={(e) => handleStatusChange(e.target.value as ClientStatus)}
+                  disabled={changeStatusMutation.isPending || viewOnly}
+                  className={cn(
+                    'px-2 py-0.5 text-xs font-medium rounded border-0 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+                    statusColors[client.status]
+                  )}
+                >
+                  <option value="active">Active</option>
+                  <option value="declined">Declined</option>
+                  <option value="not_proceeding">Not Proceeding</option>
+                </select>
+              )
+            )}
+          </div>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* SLA Countdown Section - Near top of panel */}
+        {showSLACountdowns && (firstContactSLA || clientToCaseSLA) && (
+          <div className="mt-3 flex flex-wrap gap-3">
+            {/* First Contact SLA - Always visible when available */}
+            {firstContactSLA && (
+              <SLACountdown
+                status={firstContactSLA.status as SLAStatusValue}
+                remainingHours={firstContactSLA.remaining_hours}
+                displayText={firstContactSLA.display}
+                label="First Contact SLA"
+                size="sm"
+              />
+            )}
+            {/* Client-to-Case SLA - Only show when first contact is completed */}
+            {clientToCaseSLA && clientToCaseSLA.status !== 'not_started' && (
+              <SLACountdown
+                status={clientToCaseSLA.status as SLAStatusValue}
+                remainingHours={clientToCaseSLA.remaining_hours}
+                displayText={clientToCaseSLA.display}
+                label="Client to Case SLA"
+                size="sm"
+              />
+            )}
+          </div>
+        )}
+
+        {saveError && (
+          <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded text-red-600 text-xs flex items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5" />
+            {saveError}
+          </div>
+        )}
+
+        {/* Tabs - Only show for edit mode */}
+        {!isCreateMode && (
+          <div className="flex mt-4 -mb-px">
+            <button
+              onClick={() => setActiveTab('details')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'details'
+                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
+                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              Details
+            </button>
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'documents'
+                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
+                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              Documents
+            </button>
+            <button
+              onClick={() => setActiveTab('activity')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'activity'
+                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
+                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              Activity
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      {(isCreateMode || activeTab === 'details') && (
+        <>
+          {/* Form Content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Personal Information */}
+            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Personal Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="First Name *">
+                  <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+                <FormField label="Last Name *">
+                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+                <FormField label="Phone *">
+                  <div className="flex gap-2">
+                    <select
+                      value={phoneCountryCode}
+                      onChange={(e) => setPhoneCountryCode(e.target.value)}
+                      className="h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white w-28"
+                    >
+                      {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+                    </select>
+                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="flex-1 h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                  </div>
+                </FormField>
+                <FormField label="Email *">
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+                <FormField label="Date of Birth *">
+                  <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} max={new Date().toISOString().split('T')[0]}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+                <FormField label="Nationality *">
+                  <select value={nationality} onChange={(e) => setNationality(e.target.value)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                    <option value="">Select...</option>
+                    {NATIONALITY_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Residency *">
+                  <select value={residency} onChange={(e) => setResidency(e.target.value as ResidencyType)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                    {residencyOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Employment *">
+                  <select value={employmentType} onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                    {employmentOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Source *" className="col-span-2">
+                  <TrustedSourceSelector value={subSourceId} onChange={setSubSourceId} />
+                </FormField>
+              </div>
+            </div>
+
+            {/* Application Type */}
+            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Application Type</h3>
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={applicationType === 'single'} onChange={() => setApplicationType('single')}
+                    className="w-4 h-4 text-[#1e3a5f] focus:ring-[#1e3a5f]" />
+                  <span className="text-sm text-gray-700">Individual</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={applicationType === 'joint'} onChange={() => setApplicationType('joint')}
+                    className="w-4 h-4 text-[#1e3a5f] focus:ring-[#1e3a5f]" />
+                  <span className="text-sm text-gray-700">Co-borrower</span>
+                </label>
+              </div>
+
+              {applicationType === 'joint' && (
+                <div className="pt-4 border-t border-gray-100 space-y-4">
+                  <h4 className="text-xs font-medium text-gray-500">Co-borrower Details</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField label="First Name *">
+                      <input type="text" value={coBorrowerFirstName} onChange={(e) => setCoBorrowerFirstName(e.target.value)}
+                        className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                    </FormField>
+                    <FormField label="Last Name *">
+                      <input type="text" value={coBorrowerLastName} onChange={(e) => setCoBorrowerLastName(e.target.value)}
+                        className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                    </FormField>
+                    <FormField label="Phone *">
+                      <div className="flex gap-2">
+                        <select
+                          value={coBorrowerPhoneCountryCode}
+                          onChange={(e) => setCoBorrowerPhoneCountryCode(e.target.value)}
+                          className="h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white w-28"
+                        >
+                          {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+                        </select>
+                        <input type="tel" value={coBorrowerPhone} onChange={(e) => setCoBorrowerPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                          className="flex-1 h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                      </div>
+                    </FormField>
+                    <FormField label="Email *">
+                      <input type="email" value={coBorrowerEmail} onChange={(e) => setCoBorrowerEmail(e.target.value)}
+                        className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                    </FormField>
+                    <FormField label="Monthly Salary (AED) *" className="col-span-2">
+                      <input type="text" inputMode="numeric" value={coBorrowerSalary} onChange={(e) => setCoBorrowerSalary(sanitizeAmount(e.target.value))}
+                        className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                    </FormField>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Income & Liabilities */}
+            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Income & Liabilities</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField label="Monthly Salary (AED) *">
+                  <input type="text" inputMode="numeric" value={monthlySalary} onChange={(e) => setMonthlySalary(sanitizeAmount(e.target.value))}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+                <FormField label="Total Addbacks (AED)">
+                  <input type="text" inputMode="numeric" value={totalAddbacks} onChange={(e) => setTotalAddbacks(sanitizeAmount(e.target.value))}
+                    placeholder="Rental income, bonuses, etc."
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+              </div>
+
+              <div className="pt-3 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-medium text-gray-500">Liabilities</span>
+                  {liabilities.length < 10 && (
+                    <button type="button" onClick={addLiability} className="text-xs font-medium text-[#1e3a5f] hover:underline">+ Add</button>
+                  )}
+                </div>
+                {liabilities.length > 0 && (
+                  <div className="space-y-2">
+                    {liabilities.map((liability, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                        <select value={liability.type} onChange={(e) => updateLiability(index, 'type', e.target.value)}
+                          className="h-8 px-2 text-xs border border-gray-200 rounded-md focus:outline-none bg-white shrink-0">
+                          <option value="cc">Credit Card</option>
+                          <option value="auto">Auto Loan</option>
+                          <option value="personal">Personal Loan</option>
+                          <option value="mortgage">Mortgage</option>
+                        </select>
+                        {liability.type === 'cc' && (
+                          <select value={liability.bankName || ''} onChange={(e) => updateLiability(index, 'bankName', e.target.value)}
+                            className="h-8 px-2 text-xs border border-gray-200 rounded-md focus:outline-none bg-white">
+                            <option value="">Bank</option>
+                            {UAE_BANKS.map(bank => <option key={bank} value={bank}>{bank}</option>)}
+                          </select>
+                        )}
+                        <input type="text" inputMode="numeric" value={liability.amount}
+                          onChange={(e) => updateLiability(index, 'amount', sanitizeAmount(e.target.value))}
+                          placeholder={liability.type === 'cc' ? 'Limit' : 'EMI'}
+                          className="flex-1 h-8 px-2 text-xs border border-gray-200 rounded-md focus:outline-none bg-white" />
+                        {liability.type === 'cc' && liability.amount && (
+                          <span className="text-xs font-semibold text-[#1e3a5f] whitespace-nowrap px-2 py-1 bg-blue-50 rounded">
+                            5%: {((parseFloat(liability.amount) || 0) * 0.05).toLocaleString()}
+                          </span>
+                        )}
+                        <button type="button" onClick={() => removeLiability(index)}
+                          className="p-1 text-gray-400 hover:text-red-500 rounded transition-colors shrink-0">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {liabilities.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between text-sm">
+                    <span className="text-gray-500">Total Liabilities</span>
+                    <span className="font-semibold text-gray-900">AED {calculations.totalLiabilities.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Eligibility Calculations */}
+            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Eligibility</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">DBR Available</span>
+                  <span className={`text-sm font-bold ${calculations.dbrAvailable >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    AED {calculations.dbrAvailable.toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">Max Loan</span>
+                  <span className="text-sm font-bold text-gray-900">AED {calculations.maxLoanAmount.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer - hidden in viewOnly mode */}
+          {!viewOnly && (
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 space-y-2">
+              <button onClick={handleSave} disabled={isPending}
+                className="w-full py-2.5 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2d4a6f] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {isPending ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />{isCreateMode ? 'Creating...' : 'Saving...'}</>
+                ) : (
+                  isCreateMode ? 'Create Client' : 'Save Changes'
+                )}
+              </button>
+              {!isCreateMode && !hideCreateCase && client && client.status === 'active' && (
+                <button onClick={handleConvertToCase}
+                  className="w-full py-2.5 border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                  <Briefcase className="h-4 w-4" />
+                  Create Case
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Documents Tab Content */}
+      {!isCreateMode && activeTab === 'documents' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <ClientDocumentTab clientId={clientId} />
+        </div>
+      )}
+
+      {/* Activity Tab Content */}
+      {!isCreateMode && activeTab === 'activity' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <ActivityTimeline recordType="client" recordId={clientId} />
+        </div>
+      )}
+
+      {/* Case Creation Panel */}
+      {showCaseCreation && (
+        <CaseSidePanel
+          caseId="new"
+          isOpen={showCaseCreation}
+          onClose={handleCasePanelClose}
+          preselectedClientId={clientId}
+        />
+      )}
+    </SidePanelWrapper>
+  )
+}
+
+function SidePanelWrapper({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
+      <div className="fixed right-0 top-0 h-full w-1/2 min-w-[480px] max-w-[800px] bg-white z-50 shadow-xl flex flex-col animate-slide-in-right">
+        {children}
+      </div>
+    </>
+  )
+}
+
+function FormField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function TrustedSourceSelector({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const { data: channels, isLoading } = useChannels()
+  const [subSources, setSubSources] = useState<Array<{ id: string; name: string; sourceName: string }>>([])
+  const [loadingSubSources, setLoadingSubSources] = useState(false)
+
+  useEffect(() => {
+    const fetchSubSources = async () => {
+      if (!channels || channels.length === 0) return
+
+      const trustedChannels = channels.filter(ch => ch.is_trusted)
+      if (trustedChannels.length === 0) return
+
+      setLoadingSubSources(true)
+      const allSubSources: Array<{ id: string; name: string; sourceName: string }> = []
+
+      for (const channel of trustedChannels) {
+        try {
+          const fullChannel = await api.get<Channel>(`/channels/${channel.id}/`)
+          for (const source of fullChannel.sources || []) {
+            for (const subSource of source.sub_sources || []) {
+              allSubSources.push({
+                id: subSource.id,
+                name: subSource.name,
+                sourceName: source.name,
+              })
+            }
+          }
+        } catch {
+          // Skip failed channels
+        }
+      }
+
+      setSubSources(allSubSources)
+      setLoadingSubSources(false)
+    }
+
+    fetchSubSources()
+  }, [channels])
+
+  if (isLoading || loadingSubSources) {
+    return (
+      <select className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white" disabled>
+        <option>Loading...</option>
+      </select>
+    )
+  }
+
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+      <option value="">Select source...</option>
+      {subSources.map(opt => (
+        <option key={opt.id} value={opt.id}>{opt.name} ({opt.sourceName})</option>
+      ))}
+    </select>
+  )
+}
