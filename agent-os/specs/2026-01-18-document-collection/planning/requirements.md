@@ -12,17 +12,34 @@ This separation ensures that when a Client creates multiple Cases (refinance, se
 ### First Round Questions
 
 **Q1:** What are the standard document requirements for Client-level documents?
-**Answer:** The following documents are required:
-- Passport (Required) - Identity verification
-- Emirates ID (Required) - UAE identity
-- Visa (Required, except for Non-Residents) - Residency verification
-- Salary Certificate (Required) - Income verification
-- Pay Slips (Required) - Income verification
-- Bank Statements (Required) - Financial verification
-- Liability Letters/Statements (Required) - Existing debt verification
+**Answer:** Document requirements vary based on client's **Employment Type** and **Residency Status**:
+
+**Categories (6 main + 1 conditional):**
+1. **Salaried - UAE National** (6 docs): Passport, Emirates ID, Family Book, Salary Certificate, Payslips (6 months), Personal Bank Statements (6 months)
+2. **Self-Employed - UAE National** (10 docs): Passport, Emirates ID, Family Book, Trade License, MOA with Amendments, Company Bank Statements (12 months), Personal Bank Statements (6 months), VAT Certificate, Audit Report, VAT Returns (4 quarters)
+3. **Salaried - UAE Resident** (6 docs): Passport, Emirates ID, Visa, Salary Certificate, Payslips (6 months), Personal Bank Statements (6 months)
+4. **Self-Employed - UAE Resident** (10 docs): Passport, Emirates ID, Visa, Trade License, MOA with Amendments, Company Bank Statements (12 months), Personal Bank Statements (6 months), VAT Certificate, Audit Report, VAT Returns (4 quarters)
+5. **Salaried - Non-Resident** (7 docs): Passport, National ID Card, Salary Certificate, Payslips (6 months), Personal Bank Statements (6 months), Credit Report, Utility Bill
+6. **Self-Employed - Non-Resident** (8 docs): Passport, National ID Card, Company Ownership Documents, Company Bank Statements (12 months), Personal Bank Statements (6 months), Credit Report, Utility Bill, Office Utility Bill
+
+**Conditional Documents** (14 docs - shown for all categories):
+- Credit Card Statements (If has credit cards)
+- Loan Statements (If has existing loans)
+- Educational Allowance Proof (If claiming allowance)
+- Rental Income Proof (If claiming rental income)
+- Ejari (If claiming rental income - UAE)
+- Labor Card (If bank requests)
+- Labor Contract (If bank requests)
+- Tenancy Contract (Current residence proof)
+- Title Deed (Resale/Buyout/Equity - case level)
+- MOU (Purchase/Resale - case level)
+- Valuation Report (Bank orders - case level)
+- PDC Cheques (Bank requirement - case level)
+- MC Cheque (Down payment proof - case level)
+- Payment Receipt (Payments made - case level)
 
 **Q2:** What additional documents can be added?
-**Answer:** MS can add any additional documents via "+ Add Document" button. Common examples include: Educational Allowance Proof, Rental Income Proof, Ejari, PDC Cheques, Valuation Report, Title Deed, MOU, MC Cheque, Payment Receipt, AECB/Credit Report, Labor Card, Labor Contract, Tenancy Contract, Trade License, Audited Financials, Loan Statements.
+**Answer:** MS can add any additional documents via "+ Add Document" button as custom document types.
 
 **Q3:** What are the requirements for Joint Applications?
 **Answer:** When Application Type = Joint:
@@ -82,7 +99,21 @@ No similar existing features identified for reference.
 
 ### Follow-up Questions
 
-None required - comprehensive specification provided.
+**Q11:** What happens when a client changes their employment type or residency status after uploading documents?
+**Answer:** The system implements **Option A - Keep all docs, update requirements**:
+- Existing uploaded documents are preserved
+- Common documents (Passport, Emirates ID, Bank Statements) are matched by **name** across categories
+- Category-specific documents that no longer apply appear in `other_documents` section
+- New category requirements show as "not uploaded" in the checklist
+- No documents are lost or require re-upload
+
+**Example flow:**
+1. Client is Salaried UAE Resident → uploads Passport, Emirates ID, Salary Certificate, Payslips
+2. Client changes to Self-Employed UAE Resident
+3. Result:
+   - Passport, Emirates ID, Bank Statements → **Reused** (matched by name)
+   - Salary Certificate, Payslips → **other_documents** (not required for self-employed)
+   - Trade License, MOA, VAT Certificate → **Not uploaded** (new requirements)
 
 ## Visual Assets
 
@@ -98,7 +129,13 @@ N/A
 - Two-tier document system: Client Documents (Atom B) and Case Documents (Bank Forms)
 - Client Documents persist across all Cases for that Client
 - Bank Forms are Case-specific (not shared between Cases)
+- **Document categorization by employment type and residency** (6 main categories + conditional)
+- **61 seeded document types** across all categories
+- **Dynamic checklist** based on client's employment_type and residency fields
+- **Cross-category document matching** by name when client profile changes
+- **other_documents section** for docs from previous profile that no longer apply
 - Standard document checklist with required/optional designations
+- Conditional documents section shown for all categories
 - Inline add custom documents (no modal) - type name and upload in one flow
 - Support for Joint Applications with Primary/Co-Applicant document separation
 - File upload with format validation (JPG, JPEG, PNG, HEIC, PDF)

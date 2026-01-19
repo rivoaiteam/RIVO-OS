@@ -1,11 +1,12 @@
 # Task Breakdown: Document Collection
 
 ## Overview
-Total Tasks: 30
+Total Tasks: 35
 
 This feature implements a two-tier document management system:
 - **Client-level Documents (Atom B)**: KYC and financial documents that persist across all Cases
 - **Case-level Bank Forms**: Bank-specific forms required for each application
+- **Document Categorization**: Documents are categorized by client's employment type and residency status
 
 ## Task List
 
@@ -16,20 +17,28 @@ This feature implements a two-tier document management system:
 
 - [x] 1.0 Complete document type configuration layer
   - [x] 1.1 Create DocumentType model with validations
-    - Fields: name (string), level (enum: client/case), required (boolean), description (text), applicant_type (enum: primary/co_applicant/both), display_order (integer)
-    - Validations: name presence, level presence, uniqueness of name scoped to level
+    - Fields: name (string), level (enum: client/case), category (enum), condition (string), required (boolean), description (text), applicant_type (enum: primary/co_applicant/both), display_order (integer), is_system (boolean)
+    - Validations: name presence, level presence, uniqueness of name scoped to level+category
     - Enum for level: client, case
     - Enum for applicant_type: primary, co_applicant, both
+    - Enum for category: salaried_uae_national, self_employed_uae_national, salaried_uae_resident, self_employed_uae_resident, salaried_non_resident, self_employed_non_resident, conditional
   - [x] 1.2 Create migration for document_types table
     - Add indexes for: level, required
-    - Add unique index on: [name, level]
-  - [x] 1.3 Create seed data for standard document types
-    - Client-level required: Passport, Emirates ID, Visa, Salary Certificate, Pay Slips, Bank Statements, Liability Letters/Statements
-    - Case-level required: Application Form, Salary Transfer Letter (STL), Liability Letter
+    - Add unique index on: [name, level, category]
+  - [x] 1.3 Create seed data for standard document types (61 total)
+    - Salaried UAE National (6): Passport, Emirates ID, Family Book, Salary Certificate, Payslips (6 months), Personal Bank Statements (6 months)
+    - Self-Employed UAE National (10): Passport, Emirates ID, Family Book, Trade License, MOA with Amendments, Company Bank Statements (12 months), Personal Bank Statements (6 months), VAT Certificate, Audit Report, VAT Returns (4 quarters)
+    - Salaried UAE Resident (6): Passport, Emirates ID, Visa, Salary Certificate, Payslips (6 months), Personal Bank Statements (6 months)
+    - Self-Employed UAE Resident (10): Passport, Emirates ID, Visa, Trade License, MOA with Amendments, Company Bank Statements (12 months), Personal Bank Statements (6 months), VAT Certificate, Audit Report, VAT Returns (4 quarters)
+    - Salaried Non-Resident (7): Passport, National ID Card, Salary Certificate, Payslips (6 months), Personal Bank Statements (6 months), Credit Report, Utility Bill
+    - Self-Employed Non-Resident (8): Passport, National ID Card, Company Ownership Documents, Company Bank Statements (12 months), Personal Bank Statements (6 months), Credit Report, Utility Bill, Office Utility Bill
+    - Conditional (14): Credit Card Statements, Loan Statements, Educational Allowance Proof, Rental Income Proof, Ejari, Labor Card, Labor Contract, Tenancy Contract, Title Deed, MOU, Valuation Report, PDC Cheques, MC Cheque, Payment Receipt
+  - [x] 1.4 Add UAE_NATIONAL to ResidencyType enum in Client model
 
 **Acceptance Criteria:**
 - DocumentType model correctly distinguishes client vs case level documents
-- Default document types are seeded on deployment
+- Documents are categorized by employment type and residency status
+- 61 document types seeded across 7 categories
 - Custom document types can be created via "+ Add" functionality
 
 ---
@@ -104,10 +113,15 @@ This feature implements a two-tier document management system:
     - Generate secure file URL
     - Track upload source (web/whatsapp)
   - [x] 4.3 Implement document checklist response
-    - Return all required document types with upload status
-    - Include uploaded document details where available
+    - Return document types based on client's employment_type and residency
+    - Include `get_client_document_category()` helper function
+    - Return primary, co_applicant, conditional, and other_documents sections
     - Handle joint application dual-checklist
-  - [x] 4.4 Add routes for client documents
+  - [x] 4.4 Implement cross-category document matching
+    - Match uploaded documents by NAME (not just ID) for cross-category reuse
+    - Common docs (Passport, Emirates ID, Bank Statements) reused when profile changes
+    - Category-specific docs appear in `other_documents` when no longer required
+  - [x] 4.5 Add routes for client documents
     - GET /api/clients/:client_id/documents
     - GET /api/clients/:client_id/documents/:id
     - POST /api/clients/:client_id/documents
@@ -116,8 +130,10 @@ This feature implements a two-tier document management system:
 **Acceptance Criteria:**
 - Client documents can be uploaded, viewed, and deleted
 - File validation prevents invalid uploads
-- Checklist shows required documents with status
+- Checklist shows documents based on client's employment type and residency
 - Joint applications show Primary/Co-Applicant separation
+- Profile changes preserve existing uploads via name-based matching
+- Response includes: primary, co_applicant, conditional, other_documents, category
 
 ---
 
@@ -358,6 +374,47 @@ Phase 4: Integration
 ACCEPTED_FORMATS = ['jpg', 'jpeg', 'png', 'heic', 'pdf']
 MAX_FILE_SIZE = 10_485_760  # 10 MB in bytes
 ```
+
+### Document Categorization
+Documents are categorized by client's employment type and residency status:
+
+```python
+class DocumentCategory(models.TextChoices):
+    SALARIED_UAE_NATIONAL = 'salaried_uae_national'
+    SELF_EMPLOYED_UAE_NATIONAL = 'self_employed_uae_national'
+    SALARIED_UAE_RESIDENT = 'salaried_uae_resident'
+    SELF_EMPLOYED_UAE_RESIDENT = 'self_employed_uae_resident'
+    SALARIED_NON_RESIDENT = 'salaried_non_resident'
+    SELF_EMPLOYED_NON_RESIDENT = 'self_employed_non_resident'
+    CONDITIONAL = 'conditional'
+```
+
+Category determination logic in `get_client_document_category()`:
+- UAE National + Salaried → salaried_uae_national
+- UAE National + Self-Employed → self_employed_uae_national
+- UAE Resident + Salaried → salaried_uae_resident
+- UAE Resident + Self-Employed → self_employed_uae_resident
+- Non-Resident + Salaried → salaried_non_resident
+- Non-Resident + Self-Employed → self_employed_non_resident
+
+### Document Checklist API Response
+```json
+{
+  "primary": [...],           // Required docs for current category
+  "co_applicant": [...],      // For joint applications
+  "conditional": [...],       // Conditional documents (all categories)
+  "other_documents": [...],   // Docs from previous profile
+  "is_joint_application": true/false,
+  "category": "salaried_uae_resident"
+}
+```
+
+### Cross-Category Document Matching
+When client changes profile (employment type or residency):
+1. Documents matched by **NAME** (not just ID) for cross-category reuse
+2. Common docs (Passport, Emirates ID, Bank Statements) automatically reused
+3. Category-specific docs (Salary Certificate, Trade License) go to `other_documents`
+4. No documents are deleted or require re-upload
 
 ### Joint Application Handling
 - When Application Type = Joint, duplicate document checklist for Primary and Co-Applicant
