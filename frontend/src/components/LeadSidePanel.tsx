@@ -3,11 +3,12 @@
  * 50% width slide-in panel from right for viewing/editing lead details.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle, UserPlus } from 'lucide-react'
 import { useLead, useUpdateLead, useConvertLeadToClient, useChangeLeadStatus } from '@/hooks/useLeads'
 import { ActivityTimeline } from '@/components/activity'
-import type { LeadStatus, LeadData } from '@/types/mortgage'
+import { SLACountdown } from '@/components/SLACountdown'
+import type { LeadStatus } from '@/types/mortgage'
 import { cn } from '@/lib/utils'
 
 type TabType = 'details' | 'activity'
@@ -39,10 +40,6 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
   const [status, setStatus] = useState<LeadStatus>('active')
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Debounce timer refs
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pendingUpdateRef = useRef<Record<string, string | undefined>>({})
-
   // Sync form state when lead data changes
   useEffect(() => {
     if (lead) {
@@ -54,51 +51,23 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
     }
   }, [lead])
 
-  // Cleanup debounce timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-    }
-  }, [])
+  // Handle save
+  const handleSave = async () => {
+    if (!leadId) return
 
-  // Debounced save function
-  const debouncedSave = useCallback(
-    (field: string, value: string | undefined) => {
-      if (!leadId) return
-
-      // Accumulate pending updates
-      pendingUpdateRef.current[field] = value
-
-      // Clear existing timer
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
-      }
-
-      // Set new timer
-      debounceTimerRef.current = setTimeout(async () => {
-        const updates = { ...pendingUpdateRef.current }
-        pendingUpdateRef.current = {}
-
-        try {
-          await updateMutation.mutateAsync({ id: leadId, data: updates })
-          setSaveError(null)
-        } catch (err) {
-          setSaveError(err instanceof Error ? err.message : 'Failed to save')
-        }
-      }, 500)
-    },
-    [leadId, updateMutation]
-  )
-
-  // Handle field blur for auto-save
-  const handleFieldBlur = (field: keyof LeadData, value: string) => {
-    if (!lead) return
-
-    const originalValue = (lead[field] as string | null) || ''
-    if (value !== originalValue) {
-      debouncedSave(field, value || undefined)
+    try {
+      await updateMutation.mutateAsync({
+        id: leadId,
+        data: {
+          name,
+          phone,
+          email: email || undefined,
+          intent: intent || undefined,
+        },
+      })
+      setSaveError(null)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save')
     }
   }
 
@@ -124,7 +93,6 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
     try {
       await convertMutation.mutateAsync(leadId)
       setSaveError(null)
-      // The lead status will be updated to 'converted' by the backend
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to convert lead')
     }
@@ -140,18 +108,6 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
       lead.sub_source.name,
     ].filter(Boolean)
     return parts.length > 0 ? parts.join(' / ') : '-'
-  }
-
-  // Format created at date
-  const formatCreatedAt = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
   }
 
   if (!leadId) return null
@@ -208,15 +164,13 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
           {/* SLA Display - Near top of panel */}
           {lead && lead.sla_timer && (
             <div className="mt-3">
-              <div className={cn(
-                'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium',
-                lead.sla_timer.is_overdue
-                  ? 'bg-red-50 text-red-700'
-                  : 'bg-green-50 text-green-700'
-              )}>
-                <span className="text-gray-500">SLA:</span>
-                <span>{lead.sla_timer.display || 'No SLA'}</span>
-              </div>
+              <SLACountdown
+                status={lead.sla_timer.is_overdue ? 'overdue' : 'ok'}
+                remainingHours={lead.sla_timer.remaining_minutes != null ? lead.sla_timer.remaining_minutes / 60 : null}
+                displayText={lead.sla_timer.display}
+                label="Lead SLA"
+                size="sm"
+              />
             </div>
           )}
 
@@ -279,91 +233,57 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
                   )}
 
                   {/* Editable Fields */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Name</label>
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onBlur={() => handleFieldBlur('name', name)}
-                        className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Phone</label>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        onBlur={() => handleFieldBlur('phone', phone)}
-                        className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Email</label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        onBlur={() => handleFieldBlur('email', email)}
-                        placeholder="Optional"
-                        className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">Intent</label>
-                      <textarea
-                        value={intent}
-                        onChange={(e) => setIntent(e.target.value)}
-                        onBlur={() => handleFieldBlur('intent', intent)}
-                        placeholder="Lead's interest or requirements..."
-                        rows={3}
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] resize-none"
-                      />
+                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Contact Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Name *</label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Phone *</label>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="Optional"
+                          className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Read-only Fields */}
-                  <div className="space-y-4 pt-4 border-t border-gray-100">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                        Channel / Source / Sub-source
-                      </label>
-                      <p className="text-sm text-gray-600">{getSourceDisplay()}</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-400 mb-1.5">Created At</label>
-                      <p className="text-sm text-gray-600">{formatCreatedAt(lead.created_at)}</p>
-                    </div>
+                  {/* Intent */}
+                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Intent</h3>
+                    <textarea
+                      value={intent}
+                      onChange={(e) => setIntent(e.target.value)}
+                      placeholder="Lead's interest or requirements..."
+                      rows={3}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] resize-none"
+                    />
                   </div>
 
-                  {/* Convert to Client Button */}
-                  {lead.status === 'active' && !lead.converted_client && (
-                    <div className="pt-4 border-t border-gray-100">
-                      <button
-                        onClick={handleConvert}
-                        disabled={convertMutation.isPending}
-                        className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-medium text-white bg-[#1e3a5f] rounded-lg hover:bg-[#0f2744] transition-colors disabled:opacity-50"
-                      >
-                        {convertMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Converting...
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="h-4 w-4" />
-                            Convert to Client
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
+                  {/* Source Info */}
+                  <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Source</h3>
+                    <p className="text-sm text-gray-600">{getSourceDisplay()}</p>
+                  </div>
                 </div>
               )}
 
@@ -374,6 +294,45 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
             </>
           ) : null}
         </div>
+
+        {/* Footer with Save and Convert buttons */}
+        {lead && !lead.converted_client && activeTab === 'details' && (
+          <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 space-y-2">
+            <button
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+              className="w-full py-2.5 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2d4a6f] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+            {lead.status === 'active' && (
+              <button
+                onClick={handleConvert}
+                disabled={convertMutation.isPending}
+                className="w-full py-2.5 border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {convertMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Converting...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4" />
+                    Convert to Client
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </>
   )
