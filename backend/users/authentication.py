@@ -34,6 +34,29 @@ def get_supabase_admin_client():
     return create_client(url, key)
 
 
+def verify_jwt_token(token):
+    """
+    Verify a JWT token and return the user.
+
+    Used by WebSocket consumers for authentication.
+
+    Args:
+        token: JWT token string
+
+    Returns:
+        User object if valid, None otherwise
+    """
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        user = User.objects.get(id=payload['user_id'], is_active=True)
+        return user
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, User.DoesNotExist):
+        return None
+
+
 class JWTAuthentication(authentication.BaseAuthentication):
     """
     JWT Authentication using tokens generated at login.

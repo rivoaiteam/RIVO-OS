@@ -39,6 +39,7 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(','
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # Must be first for ASGI support
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -48,14 +49,16 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'corsheaders',
+    'channels',  # Django Channels for WebSockets
     # Local apps
     'users',
-    'channels',
+    'acquisition_channels',
     'leads',
     'clients',
     'cases',
     'documents',
     'audit',
+    'whatsapp',
 ]
 
 MIDDLEWARE = [
@@ -175,3 +178,18 @@ SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '')
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
 SUPABASE_JWT_SECRET = os.environ.get('SUPABASE_JWT_SECRET', '')
+
+
+# Django Channels / ASGI configuration
+ASGI_APPLICATION = 'rivo_os.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        # For production, use Redis:
+        # 'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        # 'CONFIG': {
+        #     'hosts': [(os.environ.get('REDIS_HOST', 'localhost'), 6379)],
+        # },
+    },
+}

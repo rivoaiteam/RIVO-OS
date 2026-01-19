@@ -14,7 +14,7 @@ from django.db import models
 from django.utils import timezone
 
 from audit.models import AuditableModel
-from channels.models import SubSource
+from acquisition_channels.models import SubSource
 
 
 class ClientStatus(models.TextChoices):

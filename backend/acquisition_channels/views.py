@@ -8,8 +8,8 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from channels.models import Channel, Source, SubSource
-from channels.serializers import (
+from acquisition_channels.models import Channel, Source, SubSource
+from acquisition_channels.serializers import (
     ChannelSerializer,
     ChannelListSerializer,
     ChannelCreateSerializer,

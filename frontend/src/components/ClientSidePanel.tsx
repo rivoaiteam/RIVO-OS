@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { X, AlertCircle, Loader2, Briefcase } from 'lucide-react'
+import { X, AlertCircle, Loader2, Briefcase, MessageCircle } from 'lucide-react'
 import {
   useClient,
   useCreateClient,
@@ -16,6 +16,7 @@ import {
 import { CaseSidePanel } from '@/components/CaseSidePanel'
 import { ClientDocumentTab } from '@/components/documents'
 import { ActivityTimeline } from '@/components/activity'
+import { ClientWhatsAppTab } from '@/components/whatsapp/ClientWhatsAppTab'
 import { SLACountdown } from '@/components/SLACountdown'
 import { useChannels, type Channel } from '@/hooks/useChannels'
 import { useAuth } from '@/contexts/AuthContext'
@@ -35,7 +36,7 @@ interface ClientSidePanelProps {
   viewOnly?: boolean
 }
 
-type TabType = 'details' | 'documents' | 'activity'
+type TabType = 'details' | 'documents' | 'activity' | 'whatsapp'
 
 const statusColors: Record<ClientStatus, string> = {
   active: 'bg-green-100 text-green-700',
@@ -521,6 +522,18 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
             >
               Activity
             </button>
+            <button
+              onClick={() => setActiveTab('whatsapp')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5',
+                activeTab === 'whatsapp'
+                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
+                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              <MessageCircle className="w-4 h-4" />
+              WhatsApp
+            </button>
           </div>
         )}
       </div>
@@ -760,6 +773,13 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       {!isCreateMode && activeTab === 'activity' && (
         <div className="flex-1 overflow-y-auto p-6">
           <ActivityTimeline recordType="client" recordId={clientId} />
+        </div>
+      )}
+
+      {/* WhatsApp Tab Content */}
+      {!isCreateMode && activeTab === 'whatsapp' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <ClientWhatsAppTab clientId={clientId} clientPhone={client?.phone} />
         </div>
       )}
 

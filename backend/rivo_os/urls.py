@@ -20,10 +20,11 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('users.urls')),
-    path('api/', include('channels.urls')),
+    path('api/', include('acquisition_channels.urls')),
     path('api/', include('leads.urls')),
     path('api/', include('clients.urls')),
     path('api/', include('cases.urls')),
     path('api/', include('documents.urls')),
     path('api/', include('audit.urls')),
+    path('api/whatsapp/', include('whatsapp.urls')),
 ]

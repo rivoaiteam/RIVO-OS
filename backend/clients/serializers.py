@@ -17,7 +17,7 @@ from clients.models import (
     EmploymentType,
     Timeline,
 )
-from channels.models import SubSource
+from acquisition_channels.models import SubSource
 
 
 class SubSourceNestedSerializer(serializers.ModelSerializer):

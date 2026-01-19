@@ -3,7 +3,7 @@ Serializers for Channel, Source, and Sub-source models.
 """
 
 from rest_framework import serializers
-from channels.models import Channel, Source, SubSource
+from acquisition_channels.models import Channel, Source, SubSource
 from users.models import User
 
 

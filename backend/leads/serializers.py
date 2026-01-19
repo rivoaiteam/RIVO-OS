@@ -7,7 +7,7 @@ and status management.
 
 from rest_framework import serializers
 
-from channels.models import SubSource
+from acquisition_channels.models import SubSource
 from leads.models import Lead, LeadStatus
 
 
