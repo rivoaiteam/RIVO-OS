@@ -5,7 +5,7 @@
 
 // Status Enums
 
-export type LeadStatus = 'active' | 'converted' | 'declined' | 'not_proceeding'
+export type LeadStatus = 'active' | 'declined'
 
 export type ClientStatus = 'active' | 'converted' | 'declined' | 'not_proceeding'
 
@@ -95,6 +95,7 @@ export interface LeadListItem {
   sub_source: SubSourceSummary
   sla_display: string | null
   created_at: string
+  updated_at: string
 }
 
 export interface LeadData {
@@ -498,9 +499,7 @@ export const TERMINAL_STAGES: CaseStage[] = [
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   active: 'Active',
-  converted: 'Converted',
   declined: 'Declined',
-  not_proceeding: 'Not Proceeding',
 }
 
 export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {

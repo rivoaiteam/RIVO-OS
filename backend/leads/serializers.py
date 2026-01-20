@@ -26,7 +26,7 @@ class LeadListSerializer(serializers.ModelSerializer):
     """
     Serializer for listing leads.
 
-    Returns: id, name, phone, email, status, sub_source (nested), sla_display, created_at
+    Returns: id, name, phone, email, status, sub_source (nested), sla_display, created_at, updated_at
     """
     sub_source = SubSourceNestedSerializer(read_only=True)
     sla_display = serializers.SerializerMethodField()
@@ -35,9 +35,9 @@ class LeadListSerializer(serializers.ModelSerializer):
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'status',
-            'sub_source', 'sla_display', 'created_at'
+            'sub_source', 'sla_display', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
     def get_sla_display(self, obj: Lead) -> str:
         """Get human-readable SLA timer display."""

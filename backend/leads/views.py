@@ -257,9 +257,8 @@ class LeadViewSet(viewsets.ModelViewSet):
                 status=ClientStatus.ACTIVE,
             )
 
-            # Update lead status and link to client via UUID
+            # Link lead to client via UUID (is_terminal will return True)
             Lead.objects.filter(pk=lead.pk).update(
-                status=LeadStatus.CONVERTED,
                 converted_client_id=client.id
             )
             lead.refresh_from_db()
