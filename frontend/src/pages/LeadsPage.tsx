@@ -80,15 +80,15 @@ export function LeadsPage() {
     setFilters({ status: newStatus, page: '1' })
   }
 
-  // Format source display (Channel / Source / Sub-source)
+  // Format source display as SubSource (Source)
   const getSourceDisplay = (lead: LeadListItem) => {
     if (!lead.sub_source) return '-'
-    const parts = [
-      lead.sub_source.channel_name,
-      lead.sub_source.source_name,
-      lead.sub_source.name,
-    ].filter(Boolean)
-    return parts.length > 0 ? parts.join(' / ') : '-'
+    const subSourceName = lead.sub_source.name
+    const sourceName = lead.sub_source.source_name
+    if (subSourceName && sourceName) {
+      return `${subSourceName} (${sourceName})`
+    }
+    return subSourceName || sourceName || '-'
   }
 
   // Format created date
