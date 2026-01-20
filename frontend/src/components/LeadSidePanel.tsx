@@ -74,6 +74,10 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
     try {
       await changeStatusMutation.mutateAsync({ id: leadId, status: newStatus })
       setSaveError(null)
+      // Close panel when lead is declined
+      if (newStatus === 'declined') {
+        onClose()
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to update status')
       setStatus(lead.status) // Revert on error
