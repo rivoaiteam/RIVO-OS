@@ -164,6 +164,14 @@ class Lead(AuditableModel):
                 - is_overdue: Boolean indicating if SLA is breached
                 - display: Human-readable string (e.g., "2h 30m", "Overdue by 1h 15m")
         """
+        # SLA stops when lead is in terminal state (declined or converted)
+        if self.is_terminal:
+            return {
+                'remaining_minutes': None,
+                'is_overdue': False,
+                'display': 'Completed'
+            }
+
         deadline = self.sla_deadline
         if deadline is None:
             return {

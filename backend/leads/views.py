@@ -209,8 +209,12 @@ class LeadViewSet(viewsets.ModelViewSet):
         new_status = serializer.validated_data['status']
 
         try:
-            # Update status (bypass full_clean for status-only changes)
-            Lead.objects.filter(pk=lead.pk).update(status=new_status)
+            # Update status and updated_at (bypass full_clean for status-only changes)
+            from django.utils import timezone
+            Lead.objects.filter(pk=lead.pk).update(
+                status=new_status,
+                updated_at=timezone.now()
+            )
             lead.refresh_from_db()
 
             return Response(LeadDetailSerializer(lead).data)
