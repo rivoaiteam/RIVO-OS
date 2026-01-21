@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('channels', '0002_remove_subsource_status'),
+        ('acquisition_channels', '0002_remove_subsource_status'),
     ]
 
     operations = [

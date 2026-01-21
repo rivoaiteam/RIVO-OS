@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('leads', '0001_initial'),
-        ('channels', '0004_add_source_sla'),
+        ('acquisition_channels', '0004_add_source_sla'),
         ('clients', '0001_initial'),
     ]
 
@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='client',
             name='sub_source',
-            field=models.ForeignKey(help_text='Sub-source where client originated', on_delete=django.db.models.deletion.PROTECT, related_name='clients', to='channels.subsource'),
+            field=models.ForeignKey(help_text='Sub-source where client originated', on_delete=django.db.models.deletion.PROTECT, related_name='clients', to='acquisition_channels.subsource'),
         ),
         migrations.AddIndex(
             model_name='client',

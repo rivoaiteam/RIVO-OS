@@ -5,12 +5,14 @@
  */
 
 import { useState, useEffect } from 'react'
-import { AlertCircle, Loader2, Search, X } from 'lucide-react'
+import { AlertCircle, Loader2, Search, X, MessageCircle } from 'lucide-react'
 import { useLeads } from '@/hooks/useLeads'
+import { useCampaignDashboardWebSocket } from '@/hooks/useLeadCampaign'
 import { useUrlFilters } from '@/hooks/useUrlState'
 import { LeadSidePanel } from '@/components/LeadSidePanel'
 import { Pagination } from '@/components/Pagination'
-import type { LeadListItem, LeadStatus } from '@/types/mortgage'
+import type { LeadListItem, LeadStatus, CampaignStatus } from '@/types/mortgage'
+import { CAMPAIGN_STATUS_LABELS } from '@/types/mortgage'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 10
@@ -21,10 +23,34 @@ const STATUS_TABS: { value: LeadStatus | 'all'; label: string }[] = [
   { value: 'declined', label: 'Declined' },
 ]
 
+// Campaign status filter tabs
+const CAMPAIGN_TABS: { value: CampaignStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'All Campaign' },
+  { value: 'subscriber_pending', label: 'Pending' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'disqualified', label: 'Disqualified' },
+  { value: 'converted', label: 'Converted' },
+]
+
 const DEFAULT_FILTERS = {
   status: 'all',
+  campaign_status: 'all',
   search: '',
   page: '1',
+}
+
+// Campaign status badge colors
+const CAMPAIGN_STATUS_COLORS: Record<CampaignStatus, string> = {
+  subscriber_pending: 'bg-gray-100 text-gray-700',
+  segment_mortgaged: 'bg-blue-100 text-blue-700',
+  segment_renting: 'bg-purple-100 text-purple-700',
+  segment_other: 'bg-gray-100 text-gray-600',
+  locale_dubai: 'bg-amber-100 text-amber-700',
+  locale_abudhabi: 'bg-orange-100 text-orange-700',
+  locale_other: 'bg-gray-100 text-gray-600',
+  qualified: 'bg-green-100 text-green-700',
+  disqualified: 'bg-red-100 text-red-700',
+  converted: 'bg-emerald-100 text-emerald-700',
 }
 
 export function LeadsPage() {
@@ -34,6 +60,9 @@ export function LeadsPage() {
 
   // URL state for filters (enables deep linking)
   const [filters, setFilters] = useUrlFilters(DEFAULT_FILTERS)
+
+  // WebSocket for real-time campaign updates
+  useCampaignDashboardWebSocket()
 
   // Sync search input with URL state on mount
   useEffect(() => {
@@ -52,12 +81,14 @@ export function LeadsPage() {
 
   const currentPage = parseInt(filters.page, 10) || 1
   const statusFilter = filters.status as LeadStatus | 'all'
+  const campaignStatusFilter = filters.campaign_status as CampaignStatus | 'all'
 
   const { data, isLoading, error } = useLeads({
     page: currentPage,
     page_size: PAGE_SIZE,
     search: filters.search,
     status: statusFilter,
+    campaign_status: campaignStatusFilter,
   })
 
   const leads = data?.items || []
@@ -78,6 +109,10 @@ export function LeadsPage() {
 
   const handleStatusFilterChange = (newStatus: string) => {
     setFilters({ status: newStatus, page: '1' })
+  }
+
+  const handleCampaignStatusFilterChange = (newStatus: string) => {
+    setFilters({ campaign_status: newStatus, page: '1' })
   }
 
   // Format source display (Channel / Source / Sub-source)
@@ -181,6 +216,23 @@ export function LeadsPage() {
               </button>
             ))}
           </div>
+          {/* Campaign Status Filter */}
+          <div className="flex items-center gap-1 border-b border-gray-200 ml-4">
+            {CAMPAIGN_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                onClick={() => handleCampaignStatusFilterChange(tab.value)}
+                className={cn(
+                  'px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
+                  campaignStatusFilter === tab.value
+                    ? 'border-emerald-600 text-emerald-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -204,17 +256,23 @@ export function LeadsPage() {
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="w-[28%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[22%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Name
                 </th>
-                <th className="w-[30%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[22%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Source
                 </th>
-                <th className="w-[21%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="w-[18%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Campaign Status
+                </th>
+                <th className="w-[16%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Created
                 </th>
-                <th className="w-[21%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
-                  Last Activity
+                <th className="w-[12%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Responses
+                </th>
+                <th className="w-[10%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  Activity
                 </th>
               </tr>
             </thead>
@@ -273,6 +331,8 @@ function LeadRow({
   formatSlaDisplay: (slaDisplay: string | null) => { text: string; isOverdue: boolean }
 }) {
   const slaDisplay = formatSlaDisplay(lead.sla_display)
+  const campaignStatusColor = CAMPAIGN_STATUS_COLORS[lead.campaign_status] || 'bg-gray-100 text-gray-600'
+  const campaignStatusLabel = CAMPAIGN_STATUS_LABELS[lead.campaign_status] || lead.campaign_status
 
   return (
     <tr
@@ -298,7 +358,39 @@ function LeadRow({
         </span>
       </td>
       <td className="py-3">
+        <span className={cn(
+          'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium',
+          campaignStatusColor
+        )}>
+          {campaignStatusLabel}
+        </span>
+        {lead.current_tags && lead.current_tags.length > 0 && (
+          <div className="flex gap-1 mt-1 flex-wrap">
+            {lead.current_tags.slice(0, 2).map((tag) => (
+              <span key={tag} className="text-[9px] text-gray-400 bg-gray-50 px-1 rounded">
+                {tag}
+              </span>
+            ))}
+            {lead.current_tags.length > 2 && (
+              <span className="text-[9px] text-gray-400">+{lead.current_tags.length - 2}</span>
+            )}
+          </div>
+        )}
+      </td>
+      <td className="py-3">
         <span className="text-xs text-gray-500">{formatCreatedAt(lead.created_at)}</span>
+      </td>
+      <td className="py-3">
+        <div className="flex items-center gap-1">
+          {lead.response_count > 0 ? (
+            <>
+              <MessageCircle className="h-3 w-3 text-green-500" />
+              <span className="text-xs text-gray-700 font-medium">{lead.response_count}</span>
+            </>
+          ) : (
+            <span className="text-xs text-gray-400">-</span>
+          )}
+        </div>
       </td>
       <td className="py-3">
         <span className="text-xs text-gray-500">{formatTimeAgo(lead.updated_at)}</span>

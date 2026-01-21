@@ -253,18 +253,24 @@ def send_template_message(request):
 
 
 @csrf_exempt
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([])  # No auth - YCloud calls this endpoint
 def webhook(request):
     """
     YCloud webhook for receiving inbound WhatsApp messages and status updates.
 
-    POST /api/whatsapp/webhook/
+    GET /api/whatsapp/webhook/ - For URL validation by YCloud
+    POST /api/whatsapp/webhook/ - For receiving webhook events
 
     Events handled:
     - whatsapp.inbound_message.received: Customer sends a message
     - whatsapp.message.updated: Message status updates (delivered, read, etc.)
+    - contact.attributes_changed: Contact tag changes
     """
+    # Handle GET request for YCloud URL validation
+    if request.method == 'GET':
+        return Response({'status': 'ok'}, status=status.HTTP_200_OK)
+
     # Verify webhook signature (if secret is configured)
     signature_header = request.headers.get('YCloud-Signature', '')
     if not verify_webhook_signature(request.body, signature_header):
@@ -282,6 +288,8 @@ def webhook(request):
             return handle_inbound_message(payload)
         elif event_type == 'whatsapp.message.updated':
             return handle_message_status_update(payload)
+        elif event_type == 'contact.attributes_changed':
+            return handle_contact_attributes_changed(payload)
         else:
             logger.info(f'Unhandled webhook event type: {event_type}')
             return Response({'status': 'ignored'}, status=status.HTTP_200_OK)
@@ -307,7 +315,9 @@ def handle_inbound_message(payload):
         "customerProfile": {"name": "John"},
         "sendTime": "2026-01-19T12:00:00.000Z",
         "type": "text",
-        "text": {"body": "Hello!"}
+        "text": {"body": "Hello!"},
+        "button": {"payload": "JOIN", "text": "I'm in"},  # For button clicks
+        "context": {"from": "+918138020960", "id": "wamid.original..."}  # For replies
       }
     }
     """
@@ -321,9 +331,20 @@ def handle_inbound_message(payload):
     customer_profile = inbound_msg.get('customerProfile', {})
     customer_name = customer_profile.get('name', '')
 
+    # Extract context for replies (links to original campaign message)
+    context = inbound_msg.get('context', {})
+    context_message_id = context.get('id', '')
+
+    # Extract button payload if it's a button click
+    button_data = inbound_msg.get('button', {})
+    button_payload = button_data.get('payload', '')
+    button_text = button_data.get('text', '')
+
     # Extract message content based on type
     if message_type == 'text':
         content = inbound_msg.get('text', {}).get('body', '')
+    elif message_type == 'button':
+        content = button_text or button_payload
     elif message_type == 'image':
         content = '[Image]'
     elif message_type == 'document':
@@ -342,20 +363,25 @@ def handle_inbound_message(payload):
     client = find_client_by_phone(normalized_phone)
 
     if not client:
-        logger.warning(f'No client found for phone number: {from_number}')
-        # Still save the message but without a client link
-        # Or you could create a new client here
-        return Response({
-            'status': 'warning',
-            'message': f'No client found for phone {from_number}'
-        }, status=status.HTTP_200_OK)
+        # No client found - handle as a LEAD (campaign response)
+        logger.info(f'No client found for {from_number}, processing as lead campaign response')
+        return handle_lead_inbound_response(
+            from_number=from_number,
+            customer_name=customer_name,
+            message_type=message_type,
+            content=content,
+            ycloud_message_id=ycloud_message_id,
+            context_message_id=context_message_id,
+            button_payload=button_payload,
+            raw_payload=inbound_msg
+        )
 
     # Check for duplicate message
     if WhatsAppMessage.objects.filter(ycloud_message_id=ycloud_message_id).exists():
         logger.info(f'Duplicate message ignored: {ycloud_message_id}')
         return Response({'status': 'duplicate'}, status=status.HTTP_200_OK)
 
-    # Create the message record
+    # Create the message record for existing client
     whatsapp_message = WhatsAppMessage.objects.create(
         client=client,
         direction=MessageDirection.INBOUND,
@@ -375,8 +401,149 @@ def handle_inbound_message(payload):
 
     return Response({
         'status': 'success',
+        'type': 'client',
         'message_id': str(whatsapp_message.id)
     }, status=status.HTTP_200_OK)
+
+
+def handle_lead_inbound_response(
+    from_number: str,
+    customer_name: str,
+    message_type: str,
+    content: str,
+    ycloud_message_id: str,
+    context_message_id: str,
+    button_payload: str,
+    raw_payload: dict
+):
+    """
+    Handle inbound message as a lead campaign response.
+
+    This is called when no existing client matches the phone number,
+    indicating this is a new lead responding to a WhatsApp campaign.
+    """
+    from leads.services import LeadTrackingService
+    from leads.models import LeadMessage
+
+    # Check for duplicate in lead messages
+    if LeadMessage.objects.filter(ycloud_message_id=ycloud_message_id).exists():
+        logger.info(f'Duplicate lead message ignored: {ycloud_message_id}')
+        return Response({'status': 'duplicate', 'type': 'lead'}, status=status.HTTP_200_OK)
+
+    try:
+        # Process as lead campaign response
+        lead = LeadTrackingService.handle_inbound_response(
+            phone=from_number,
+            name=customer_name,
+            message_type='button' if message_type == 'button' else 'text',
+            content=content,
+            ycloud_message_id=ycloud_message_id,
+            context_message_id=context_message_id,
+            button_payload=button_payload,
+            metadata={'raw_payload': raw_payload}
+        )
+
+        logger.info(f'Created/updated lead {lead.id} from campaign response')
+
+        return Response({
+            'status': 'success',
+            'type': 'lead',
+            'lead_id': str(lead.id),
+            'lead_name': lead.name
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f'Failed to process lead inbound response: {e}')
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_200_OK)
+
+
+def handle_contact_attributes_changed(payload):
+    """
+    Handle YCloud contact.attributes_changed webhook event.
+
+    Processes tag changes and updates lead campaign status.
+
+    Payload structure:
+    {
+      "id": "evt_xxx",
+      "type": "contact.attributes_changed",
+      "contact": {
+        "id": "cont_xxx",
+        "phoneNumber": "+971501234567",
+        "countryCode": "AE"
+      },
+      "changedAttributes": {
+        "tags": {
+          "oldValue": ["subscriber_pending"],
+          "newValue": ["subscriber_pending", "qualified"],
+          "extra": {
+            "action": "ADDED",
+            "tagId": "tag_xxx",
+            "tagName": "qualified"
+          }
+        }
+      }
+    }
+    """
+    from leads.services import LeadTrackingService
+
+    contact = payload.get('contact', {})
+    ycloud_contact_id = contact.get('id', '')
+    phone = contact.get('phoneNumber', '')
+
+    changed_attrs = payload.get('changedAttributes', {})
+    tags_change = changed_attrs.get('tags', {})
+
+    if not tags_change:
+        logger.info('No tag change in contact.attributes_changed event')
+        return Response({'status': 'ignored', 'reason': 'no tag change'}, status=status.HTTP_200_OK)
+
+    old_tags = tags_change.get('oldValue', [])
+    new_tags = tags_change.get('newValue', [])
+    extra = tags_change.get('extra', {})
+
+    # Handle both single tag change and multiple tag changes
+    if isinstance(extra, list):
+        # Multiple tag changes
+        for change in extra:
+            action = change.get('action', 'UNKNOWN')
+            changed_tag = change.get('tagName', '') or change.get('value', '')
+            _process_tag_change(ycloud_contact_id, phone, old_tags, new_tags, action, changed_tag)
+    else:
+        # Single tag change
+        action = extra.get('action', 'UNKNOWN')
+        changed_tag = extra.get('tagName', '') or extra.get('value', '')
+        _process_tag_change(ycloud_contact_id, phone, old_tags, new_tags, action, changed_tag)
+
+    return Response({
+        'status': 'success',
+        'phone': phone,
+        'new_tags': new_tags
+    }, status=status.HTTP_200_OK)
+
+
+def _process_tag_change(ycloud_contact_id, phone, old_tags, new_tags, action, changed_tag):
+    """Process a single tag change."""
+    from leads.services import LeadTrackingService
+
+    logger.info(f'Tag change for {phone}: {action} "{changed_tag}"')
+
+    lead = LeadTrackingService.handle_tag_change(
+        ycloud_contact_id=ycloud_contact_id,
+        phone=phone,
+        old_tags=old_tags,
+        new_tags=new_tags,
+        action=action,
+        changed_tag=changed_tag
+    )
+
+    if lead:
+        logger.info(f'Updated lead {lead.id} tags: {new_tags}, status: {lead.campaign_status}')
+    else:
+        logger.warning(f'Lead not found for tag change: {phone}')
 
 
 def handle_message_status_update(payload):

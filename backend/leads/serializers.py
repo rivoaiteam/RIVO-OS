@@ -8,7 +8,7 @@ and status management.
 from rest_framework import serializers
 
 from acquisition_channels.models import SubSource
-from leads.models import Lead, LeadStatus
+from leads.models import Lead, LeadStatus, CampaignStatus, LeadInteraction, LeadMessage
 
 
 class SubSourceNestedSerializer(serializers.ModelSerializer):
@@ -26,16 +26,23 @@ class LeadListSerializer(serializers.ModelSerializer):
     """
     Serializer for listing leads.
 
-    Returns: id, name, phone, email, status, sub_source (nested), sla_display, created_at, updated_at
+    Returns: id, name, phone, email, status, sub_source (nested), sla_display,
+             campaign_status, campaign_status_display, current_tags, response_count,
+             first_response_at, last_response_at, created_at, updated_at
     """
     sub_source = SubSourceNestedSerializer(read_only=True)
     sla_display = serializers.SerializerMethodField()
+    campaign_status_display = serializers.CharField(source='get_campaign_status_display', read_only=True)
 
     class Meta:
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'status',
-            'sub_source', 'sla_display', 'created_at', 'updated_at'
+            'sub_source', 'sla_display',
+            # Campaign tracking fields
+            'campaign_status', 'campaign_status_display', 'current_tags',
+            'response_count', 'first_response_at', 'last_response_at',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -48,17 +55,21 @@ class LeadDetailSerializer(serializers.ModelSerializer):
     """
     Serializer for lead detail view.
 
-    Returns all lead fields plus computed sla_timer.
+    Returns all lead fields plus computed sla_timer and campaign tracking.
     """
     sub_source = SubSourceNestedSerializer(read_only=True)
     sla_timer = serializers.SerializerMethodField()
     is_terminal = serializers.BooleanField(read_only=True)
+    campaign_status_display = serializers.CharField(source='get_campaign_status_display', read_only=True)
 
     class Meta:
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'intent', 'status',
             'sub_source', 'converted_client_id', 'sla_timer', 'is_terminal',
+            # Campaign tracking fields
+            'ycloud_contact_id', 'campaign_status', 'campaign_status_display',
+            'current_tags', 'response_count', 'first_response_at', 'last_response_at',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'converted_client_id', 'created_at', 'updated_at']
@@ -156,3 +167,29 @@ class LeadChangeStatusSerializer(serializers.Serializer):
         raise serializers.ValidationError(
             f'Cannot transition from {lead.status} to {value}.'
         )
+
+
+class LeadInteractionSerializer(serializers.ModelSerializer):
+    """Serializer for lead interactions (campaign journey events)."""
+
+    class Meta:
+        model = LeadInteraction
+        fields = [
+            'id', 'interaction_type', 'content', 'tag_value',
+            'template_name', 'original_message_id', 'metadata', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class LeadMessageSerializer(serializers.ModelSerializer):
+    """Serializer for lead WhatsApp messages."""
+
+    class Meta:
+        model = LeadMessage
+        fields = [
+            'id', 'direction', 'message_type', 'content', 'status',
+            'ycloud_message_id', 'from_number', 'to_number',
+            'button_payload', 'template_name', 'reply_to_message_id',
+            'created_at', 'sent_at', 'delivered_at'
+        ]
+        read_only_fields = ['id', 'created_at']

@@ -7,6 +7,33 @@
 
 export type LeadStatus = 'active' | 'declined'
 
+// Campaign Status (for WhatsApp campaign tracking)
+export type CampaignStatus =
+  | 'subscriber_pending'
+  | 'segment_mortgaged'
+  | 'segment_renting'
+  | 'segment_other'
+  | 'locale_dubai'
+  | 'locale_abudhabi'
+  | 'locale_other'
+  | 'qualified'
+  | 'disqualified'
+  | 'converted'
+
+// Lead Interaction Types (for journey tracking)
+export type LeadInteractionType =
+  | 'template_sent'
+  | 'button_click'
+  | 'text_reply'
+  | 'tag_added'
+  | 'tag_removed'
+  | 'status_change'
+
+// Lead Message Types
+export type LeadMessageDirection = 'outbound' | 'inbound'
+export type LeadMessageType = 'text' | 'template' | 'button' | 'image' | 'document'
+export type LeadMessageStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
+
 export type ClientStatus = 'active' | 'converted' | 'declined' | 'not_proceeding'
 
 export type CaseStage =
@@ -94,6 +121,13 @@ export interface LeadListItem {
   status: LeadStatus
   sub_source: SubSourceSummary
   sla_display: string | null
+  // Campaign tracking fields
+  campaign_status: CampaignStatus
+  campaign_status_display: string
+  current_tags: string[]
+  response_count: number
+  first_response_at: string | null
+  last_response_at: string | null
   created_at: string
   updated_at: string
 }
@@ -114,8 +148,62 @@ export interface LeadData {
     is_overdue: boolean
     display: string | null
   }
+  // Campaign tracking fields
+  ycloud_contact_id: string
+  campaign_status: CampaignStatus
+  campaign_status_display: string
+  current_tags: string[]
+  response_count: number
+  first_response_at: string | null
+  last_response_at: string | null
   created_at: string
   updated_at: string
+}
+
+// Lead Interaction (journey event)
+export interface LeadInteraction {
+  id: string
+  interaction_type: LeadInteractionType
+  content: string
+  tag_value: string
+  template_name: string
+  original_message_id: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+// Lead Message (WhatsApp message for leads)
+export interface LeadMessage {
+  id: string
+  direction: LeadMessageDirection
+  message_type: LeadMessageType
+  content: string
+  status: LeadMessageStatus
+  ycloud_message_id: string
+  from_number: string
+  to_number: string
+  button_payload: string
+  template_name: string
+  reply_to_message_id: string
+  created_at: string
+  sent_at: string | null
+  delivered_at: string | null
+}
+
+// Lead Journey Response
+export interface LeadJourneyResponse {
+  lead: LeadData
+  interactions: LeadInteraction[]
+  messages: LeadMessage[]
+}
+
+// Campaign Dashboard Response
+export interface CampaignDashboardResponse {
+  status_distribution: Record<CampaignStatus, number>
+  total_leads: number
+  total_responses: number
+  response_rate: number
+  recent_leads: LeadListItem[]
 }
 
 export interface CreateLeadData {
@@ -455,6 +543,7 @@ export interface LeadsQueryParams {
   page_size?: number
   search?: string
   status?: LeadStatus | 'all'
+  campaign_status?: CampaignStatus | 'all'
 }
 
 export interface ClientsQueryParams {
@@ -500,6 +589,28 @@ export const TERMINAL_STAGES: CaseStage[] = [
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   active: 'Active',
   declined: 'Declined',
+}
+
+export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
+  subscriber_pending: 'Subscriber Pending',
+  segment_mortgaged: 'Mortgaged',
+  segment_renting: 'Renting',
+  segment_other: 'Other Segment',
+  locale_dubai: 'Dubai',
+  locale_abudhabi: 'Abu Dhabi',
+  locale_other: 'Other Locale',
+  qualified: 'Qualified',
+  disqualified: 'Disqualified',
+  converted: 'Converted',
+}
+
+export const LEAD_INTERACTION_TYPE_LABELS: Record<LeadInteractionType, string> = {
+  template_sent: 'Template Sent',
+  button_click: 'Button Click',
+  text_reply: 'Text Reply',
+  tag_added: 'Tag Added',
+  tag_removed: 'Tag Removed',
+  status_change: 'Status Change',
 }
 
 export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {

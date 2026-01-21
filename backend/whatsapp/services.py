@@ -296,6 +296,58 @@ class YCloudService:
             logger.error(f'YCloud API request failed: {str(e)}')
             raise YCloudError(f'Network error: {str(e)}')
 
+    def list_templates(self, page: int = 1, limit: int = 100) -> list[dict]:
+        """
+        List all WhatsApp templates from YCloud.
+
+        Args:
+            page: Page number (default: 1)
+            limit: Number of templates per page (default: 100)
+
+        Returns:
+            List of template objects with name, status, components, etc.
+
+        Raises:
+            YCloudError: If the API request fails
+        """
+        if not self.api_key:
+            raise YCloudError('YCLOUD_API_KEY not configured')
+
+        url = f'{YCLOUD_API_BASE_URL}/whatsapp/templates'
+        params = {
+            'page': page,
+            'limit': limit,
+        }
+
+        logger.info(f'Fetching WhatsApp templates from YCloud (page={page}, limit={limit})')
+
+        try:
+            response = requests.get(
+                url,
+                params=params,
+                headers=self._get_headers(),
+                timeout=30
+            )
+
+            response_data = response.json() if response.content else {}
+
+            if response.status_code >= 400:
+                error_msg = response_data.get('message', 'Unknown error')
+                logger.error(f'YCloud API error: {error_msg} (status={response.status_code})')
+                raise YCloudError(
+                    message=error_msg,
+                    status_code=response.status_code,
+                    response_data=response_data
+                )
+
+            templates = response_data.get('items', [])
+            logger.info(f'Fetched {len(templates)} templates from YCloud')
+            return templates
+
+        except requests.RequestException as e:
+            logger.error(f'YCloud API request failed: {str(e)}')
+            raise YCloudError(f'Network error: {str(e)}')
+
 
 # Singleton instance
 ycloud_service = YCloudService()

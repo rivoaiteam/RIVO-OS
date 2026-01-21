@@ -779,7 +779,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       {/* WhatsApp Tab Content */}
       {!isCreateMode && activeTab === 'whatsapp' && (
         <div className="flex-1 overflow-y-auto p-6">
-          <ClientWhatsAppTab clientId={clientId} clientPhone={client?.phone} />
+          <ClientWhatsAppTab clientId={clientId} clientPhone={client?.phone} client={client} />
         </div>
       )}
 

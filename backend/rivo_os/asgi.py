@@ -20,11 +20,15 @@ django_asgi_app = get_asgi_application()
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 
-from whatsapp.routing import websocket_urlpatterns
+from whatsapp.routing import websocket_urlpatterns as whatsapp_ws_patterns
+from leads.routing import websocket_urlpatterns as leads_ws_patterns
+
+# Combine all WebSocket URL patterns
+all_websocket_patterns = whatsapp_ws_patterns + leads_ws_patterns
 
 application = ProtocolTypeRouter({
     'http': django_asgi_app,
     'websocket': AuthMiddlewareStack(
-        URLRouter(websocket_urlpatterns)
+        URLRouter(all_websocket_patterns)
     ),
 })

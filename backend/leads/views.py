@@ -14,15 +14,25 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from leads.models import Lead, LeadStatus
+from django.db.models import Count
+from django.utils import timezone
+from datetime import timedelta
+
+from leads.models import (
+    Lead, LeadStatus, CampaignStatus, LeadInteraction, LeadMessage,
+    MessageDirection, LeadMessageStatus, LeadMessageType
+)
 from leads.serializers import (
     LeadChangeStatusSerializer,
     LeadCreateSerializer,
     LeadDetailSerializer,
     LeadListSerializer,
     LeadUpdateSerializer,
+    LeadInteractionSerializer,
+    LeadMessageSerializer,
 )
 from users.permissions import IsAuthenticated
+from whatsapp.services import ycloud_service, YCloudError
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +112,11 @@ class LeadViewSet(viewsets.ModelViewSet):
         channel_id = self.request.query_params.get('channel_id', '').strip()
         if channel_id:
             queryset = queryset.filter(sub_source__source__channel_id=channel_id)
+
+        # Campaign status filter
+        campaign_status_filter = self.request.query_params.get('campaign_status', '').strip()
+        if campaign_status_filter and campaign_status_filter in CampaignStatus.values:
+            queryset = queryset.filter(campaign_status=campaign_status_filter)
 
         return queryset
 
@@ -291,3 +306,317 @@ class LeadViewSet(viewsets.ModelViewSet):
             {'error': 'Leads cannot be deleted.'},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
+
+    @action(detail=False, methods=['get'])
+    def campaign_dashboard(self, request: Request) -> Response:
+        """
+        Get campaign lead statistics and recent activity.
+
+        GET /leads/campaign_dashboard/
+
+        Returns:
+            - status_distribution: Count of leads by campaign_status
+            - recent_leads: Last 10 leads that responded (24 hours)
+            - total_leads: Total lead count
+            - responding_leads: Leads with response_count > 0
+            - response_rate: Percentage of leads that responded
+        """
+        # Status distribution
+        status_counts = Lead.objects.values('campaign_status').annotate(
+            count=Count('id')
+        ).order_by('campaign_status')
+
+        # Convert to dict with status labels
+        status_distribution = []
+        for item in status_counts:
+            status_value = item['campaign_status']
+            status_label = CampaignStatus(status_value).label if status_value else 'Unknown'
+            status_distribution.append({
+                'status': status_value,
+                'label': status_label,
+                'count': item['count']
+            })
+
+        # Recent leads (last 24 hours with responses)
+        since = timezone.now() - timedelta(hours=24)
+        recent_leads = Lead.objects.filter(
+            first_response_at__gte=since
+        ).order_by('-first_response_at')[:10]
+
+        # Response rate calculation
+        total_leads = Lead.objects.count()
+        responding_leads = Lead.objects.filter(response_count__gt=0).count()
+        response_rate = (responding_leads / total_leads * 100) if total_leads > 0 else 0
+
+        return Response({
+            'status_distribution': status_distribution,
+            'recent_leads': LeadListSerializer(recent_leads, many=True).data,
+            'total_leads': total_leads,
+            'responding_leads': responding_leads,
+            'response_rate': round(response_rate, 1)
+        })
+
+    @action(detail=True, methods=['get'])
+    def journey(self, request: Request, pk=None) -> Response:
+        """
+        Get the complete interaction history for a lead.
+
+        GET /leads/{id}/journey/
+
+        Returns the lead's journey through campaign interactions,
+        including button clicks, text replies, tag changes, and status changes.
+        """
+        lead = self.get_object()
+
+        # Get interactions and messages
+        interactions = lead.interactions.order_by('created_at')
+        messages = lead.messages.order_by('created_at')
+
+        # Merge and sort by timestamp
+        journey_items = []
+
+        for interaction in interactions:
+            journey_items.append({
+                'type': 'interaction',
+                'interaction_type': interaction.interaction_type,
+                'content': interaction.content,
+                'tag_value': interaction.tag_value,
+                'template_name': interaction.template_name,
+                'created_at': interaction.created_at.isoformat(),
+                'metadata': interaction.metadata
+            })
+
+        for message in messages:
+            journey_items.append({
+                'type': 'message',
+                'direction': message.direction,
+                'message_type': message.message_type,
+                'content': message.content,
+                'status': message.status,
+                'button_payload': message.button_payload,
+                'created_at': message.created_at.isoformat()
+            })
+
+        # Sort by timestamp
+        journey_items.sort(key=lambda x: x['created_at'])
+
+        # Get campaign enrollments
+        campaign_enrollments = []
+        try:
+            from campaigns.services import CampaignService
+            campaign_enrollments = CampaignService.get_lead_enrollments(lead)
+        except Exception as e:
+            logger.warning(f'Failed to get campaign enrollments for lead {lead.id}: {e}')
+
+        return Response({
+            'lead_id': str(lead.id),
+            'lead_name': lead.name,
+            'lead_phone': lead.phone,
+            'current_status': lead.campaign_status,
+            'current_status_display': lead.get_campaign_status_display(),
+            'current_tags': lead.current_tags,
+            'journey': journey_items,
+            'campaign_enrollments': campaign_enrollments,
+            'stats': {
+                'total_interactions': interactions.count(),
+                'total_messages': messages.count(),
+                'first_response': lead.first_response_at.isoformat() if lead.first_response_at else None,
+                'last_response': lead.last_response_at.isoformat() if lead.last_response_at else None,
+                'response_count': lead.response_count
+            }
+        })
+
+    @action(detail=False, methods=['get'])
+    def by_campaign_status(self, request: Request) -> Response:
+        """
+        Filter leads by campaign status.
+
+        GET /leads/by_campaign_status/?status=qualified
+
+        Returns paginated list of leads filtered by campaign_status.
+        """
+        campaign_status_param = request.query_params.get('status', '')
+
+        queryset = self.get_queryset()
+        if campaign_status_param and campaign_status_param in CampaignStatus.values:
+            queryset = queryset.filter(campaign_status=campaign_status_param)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = LeadListSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = LeadListSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def campaign_statuses(self, request: Request) -> Response:
+        """
+        Get available campaign status choices.
+
+        GET /leads/campaign_statuses/
+
+        Returns list of campaign status options with value and label.
+        """
+        statuses = [
+            {'value': choice.value, 'label': choice.label}
+            for choice in CampaignStatus
+        ]
+        return Response(statuses)
+
+    @action(detail=True, methods=['get'])
+    def messages(self, request: Request, pk=None) -> Response:
+        """
+        Get all WhatsApp messages for a specific lead.
+
+        GET /api/leads/{lead_id}/messages/
+
+        Returns all messages with the lead, sorted by created_at.
+        """
+        lead = self.get_object()
+
+        messages = LeadMessage.objects.filter(lead=lead).order_by('created_at')
+
+        # Sync status from YCloud for outbound messages that aren't read/failed yet
+        for msg in messages:
+            if (msg.direction == MessageDirection.OUTBOUND and
+                msg.ycloud_message_id and
+                msg.status not in [LeadMessageStatus.READ, LeadMessageStatus.FAILED]):
+                try:
+                    ycloud_data = ycloud_service.get_message_status(msg.ycloud_message_id)
+                    ycloud_status = ycloud_data.get('status', '').lower()
+
+                    status_map = {
+                        'sent': LeadMessageStatus.SENT,
+                        'delivered': LeadMessageStatus.DELIVERED,
+                        'read': LeadMessageStatus.READ,
+                        'failed': LeadMessageStatus.FAILED,
+                    }
+
+                    if ycloud_status in status_map:
+                        new_status = status_map[ycloud_status]
+                        if msg.status != new_status:
+                            msg.status = new_status
+                            if ycloud_data.get('deliverTime'):
+                                from django.utils.dateparse import parse_datetime
+                                msg.delivered_at = parse_datetime(ycloud_data['deliverTime'])
+                            msg.save()
+                            logger.info(f'Updated lead message {msg.id} status to {new_status}')
+
+                except YCloudError as e:
+                    logger.warning(f'Failed to sync status for lead message {msg.id}: {e.message}')
+
+        # Refresh queryset after updates
+        messages = LeadMessage.objects.filter(lead=lead).order_by('created_at')
+        serializer = LeadMessageSerializer(messages, many=True)
+
+        return Response({
+            'lead_id': str(lead.id),
+            'lead_name': lead.name,
+            'lead_phone': lead.phone,
+            'messages': serializer.data,
+            'count': messages.count()
+        })
+
+    @action(detail=True, methods=['post'], url_path='messages/send')
+    def send_message(self, request: Request, pk=None) -> Response:
+        """
+        Send a WhatsApp message to a lead.
+
+        POST /api/leads/{lead_id}/messages/send/
+        Body: { "message": "Hello!" }
+
+        Creates a LeadMessage record and sends via YCloud.
+        """
+        lead = self.get_object()
+
+        message_content = request.data.get('message', '').strip()
+        if not message_content:
+            return Response(
+                {'error': 'Message cannot be empty'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate lead has a phone number
+        if not lead.phone:
+            return Response(
+                {'error': 'Lead does not have a phone number'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create the message record
+        lead_message = LeadMessage.objects.create(
+            lead=lead,
+            direction=MessageDirection.OUTBOUND,
+            message_type=LeadMessageType.TEXT,
+            content=message_content,
+            status=LeadMessageStatus.PENDING,
+            from_number=ycloud_service.from_number,
+            to_number=lead.phone,
+        )
+
+        # Send via YCloud
+        try:
+            ycloud_response = ycloud_service.send_text_message(
+                to_number=lead.phone,
+                message=message_content
+            )
+
+            # Update message with success
+            lead_message.ycloud_message_id = ycloud_response.get('id', '')
+            lead_message.status = LeadMessageStatus.SENT
+            lead_message.sent_at = timezone.now()
+            lead_message.save()
+
+            logger.info(f'WhatsApp message sent to lead {lead.id}: {lead_message.id}')
+
+            # Broadcast to WebSocket
+            self._broadcast_lead_message(lead, lead_message)
+
+            return Response({
+                'success': True,
+                'message': LeadMessageSerializer(lead_message).data,
+                'ycloud_response': ycloud_response
+            }, status=status.HTTP_201_CREATED)
+
+        except YCloudError as e:
+            # Update message with failure
+            lead_message.status = LeadMessageStatus.FAILED
+            lead_message.save()
+
+            logger.error(f'Failed to send WhatsApp message to lead {lead.id}: {e.message}')
+
+            return Response({
+                'success': False,
+                'error': e.message,
+                'message': LeadMessageSerializer(lead_message).data
+            }, status=status.HTTP_502_BAD_GATEWAY)
+
+    def _broadcast_lead_message(self, lead: Lead, message: LeadMessage) -> None:
+        """Broadcast new message to WebSocket subscribers."""
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+
+            channel_layer = get_channel_layer()
+            if channel_layer is None:
+                logger.debug('No channel layer configured, skipping WebSocket broadcast')
+                return
+
+            message_data = LeadMessageSerializer(message).data
+
+            async_to_sync(channel_layer.group_send)(
+                f'lead_whatsapp_{lead.id}',
+                {
+                    'type': 'lead_message',
+                    'message': {
+                        'event': 'new_message',
+                        'data': message_data
+                    }
+                }
+            )
+
+            logger.debug(f'Broadcast message {message.id} to WebSocket group lead_whatsapp_{lead.id}')
+
+        except Exception as e:
+            logger.error(f'Failed to broadcast lead message to WebSocket: {e}')

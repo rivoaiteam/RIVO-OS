@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('channels', '0004_add_source_sla'),
+        ('acquisition_channels', '0004_add_source_sla'),
     ]
 
     operations = [
@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 ('converted_client_id', models.UUIDField(blank=True, help_text='Client record ID created when lead was converted', null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True, help_text='Timestamp when lead was created')),
                 ('updated_at', models.DateTimeField(auto_now=True, help_text='Timestamp when lead was last updated')),
-                ('sub_source', models.ForeignKey(help_text='Sub-source this lead came from (must be untrusted channel)', on_delete=django.db.models.deletion.PROTECT, related_name='leads', to='channels.subsource')),
+                ('sub_source', models.ForeignKey(help_text='Sub-source this lead came from (must be untrusted channel)', on_delete=django.db.models.deletion.PROTECT, related_name='leads', to='acquisition_channels.subsource')),
             ],
             options={
                 'db_table': 'leads',

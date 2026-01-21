@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
                 ('is_active', models.BooleanField(default=True, help_text='Whether this source is active')),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('channel', models.ForeignKey(help_text='Parent channel', on_delete=django.db.models.deletion.CASCADE, related_name='sources', to='channels.channel')),
+                ('channel', models.ForeignKey(help_text='Parent channel', on_delete=django.db.models.deletion.CASCADE, related_name='sources', to='acquisition_channels.channel')),
             ],
             options={
                 'db_table': 'sources',
@@ -58,7 +58,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('linked_user', models.ForeignKey(blank=True, help_text='Linked MS user (for BH Mortgage Team self-sourcing)', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='linked_sub_sources', to='users.user')),
-                ('source', models.ForeignKey(help_text='Parent source', on_delete=django.db.models.deletion.CASCADE, related_name='sub_sources', to='channels.source')),
+                ('source', models.ForeignKey(help_text='Parent source', on_delete=django.db.models.deletion.CASCADE, related_name='sub_sources', to='acquisition_channels.source')),
             ],
             options={
                 'db_table': 'sub_sources',
