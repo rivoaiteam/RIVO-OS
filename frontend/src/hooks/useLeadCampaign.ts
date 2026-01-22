@@ -9,9 +9,6 @@ import { api } from '@/lib/api'
 import type {
   LeadData,
   LeadListItem,
-  LeadInteraction,
-  LeadMessage,
-  LeadJourneyResponse,
   CampaignDashboardResponse,
   CampaignStatus,
   PaginatedResponse,
@@ -146,7 +143,7 @@ const getLeadWebSocketUrl = (leadId: string, token: string) => {
 export function useLeadWebSocket(leadId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
   const queryClient = useQueryClient()
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const getAuthToken = useCallback(() => {
     const stored = localStorage.getItem('rivo-auth')

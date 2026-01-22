@@ -25,7 +25,7 @@ const getWebSocketUrl = (leadId: string, token: string) => {
 export function useLeadWhatsAppWebSocket(leadId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
   const queryClient = useQueryClient()
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const getAuthToken = useCallback(() => {
     const stored = localStorage.getItem('rivo-auth')

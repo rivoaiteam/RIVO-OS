@@ -73,8 +73,9 @@ export function buildVariableMap(data: Partial<ClientData>): Record<string, stri
  */
 export function fillTemplateVariables(
   content: string,
-  data: Partial<ClientData>
+  data?: Partial<ClientData> | { name?: string; phone?: string; email?: string }
 ): string {
+  if (!data) return content
   const variables = buildVariableMap(data)
 
   return content.replace(/\{(\w+)\}/g, (match, key) => {

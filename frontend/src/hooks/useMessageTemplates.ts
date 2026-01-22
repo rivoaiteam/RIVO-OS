@@ -120,7 +120,7 @@ export function useCreateTemplate() {
         return await api.post<MessageTemplate>('/message-templates/', data)
       } catch (error) {
         if (error instanceof ApiError) {
-          throw new Error(error.data?.detail || 'Failed to create template')
+          throw new Error((error.data as { detail?: string })?.detail || 'Failed to create template')
         }
         throw error
       }
@@ -143,7 +143,7 @@ export function useUpdateTemplate() {
         return await api.patch<MessageTemplate>(`/message-templates/${id}/`, data)
       } catch (error) {
         if (error instanceof ApiError) {
-          throw new Error(error.data?.detail || 'Failed to update template')
+          throw new Error((error.data as { detail?: string })?.detail || 'Failed to update template')
         }
         throw error
       }
@@ -167,7 +167,7 @@ export function useDeleteTemplate() {
         await api.delete(`/message-templates/${id}/`)
       } catch (error) {
         if (error instanceof ApiError) {
-          throw new Error(error.data?.detail || 'Failed to delete template')
+          throw new Error((error.data as { detail?: string })?.detail || 'Failed to delete template')
         }
         throw error
       }
