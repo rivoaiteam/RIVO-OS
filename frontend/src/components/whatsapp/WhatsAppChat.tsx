@@ -100,7 +100,7 @@ export function WhatsAppChat({ messages, isLoading, isSending, onSend, clientInf
       {/* Messages - takes all available space */}
       <div className="flex-1 overflow-y-auto space-y-3 p-3 bg-[#EFEAE2] rounded-lg">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full min-h-[150px] text-gray-400">
             <p className="text-sm">No messages yet</p>
             <p className="text-xs mt-1">Send a message to start the conversation</p>
           </div>
