@@ -13,7 +13,8 @@ from django.db import models
 from django.utils import timezone
 
 from audit.models import AuditableModel
-from acquisition_channels.models import SubSource
+from channels.models import SubSource
+from common.sla import format_sla_duration
 
 
 class LeadStatus(models.TextChoices):
@@ -228,6 +229,14 @@ class Lead(AuditableModel):
                 - is_overdue: Boolean indicating if SLA is breached
                 - display: Human-readable string (e.g., "2h 30m", "Overdue by 1h 15m")
         """
+        # SLA stops when lead is in terminal state (declined or converted)
+        if self.is_terminal:
+            return {
+                'remaining_minutes': None,
+                'is_overdue': False,
+                'display': 'Completed'
+            }
+
         deadline = self.sla_deadline
         if deadline is None:
             return {
@@ -242,20 +251,9 @@ class Lead(AuditableModel):
         is_overdue = remaining_minutes < 0
 
         if is_overdue:
-            overdue_minutes = abs(remaining_minutes)
-            hours = overdue_minutes // 60
-            minutes = overdue_minutes % 60
-            if hours > 0:
-                display = f"Overdue by {hours}h {minutes}m"
-            else:
-                display = f"Overdue by {minutes}m"
+            display = format_sla_duration(abs(remaining_minutes), 'overdue')
         else:
-            hours = remaining_minutes // 60
-            minutes = remaining_minutes % 60
-            if hours > 0:
-                display = f"{hours}h {minutes}m"
-            else:
-                display = f"{minutes}m"
+            display = format_sla_duration(remaining_minutes, 'remaining')
 
         return {
             'remaining_minutes': remaining_minutes,

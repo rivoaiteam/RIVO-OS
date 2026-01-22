@@ -11,6 +11,8 @@ import type {
   CreateClientData,
   UpdateClientData,
   UpdateCoApplicantData,
+  UpdateClientExtraDetailsData,
+  ClientExtraDetailsData,
   ClientsQueryParams,
   ClientStatus,
   PaginatedResponse,
@@ -28,10 +30,12 @@ export function useClients(params: ClientsQueryParams = {}) {
     search = '',
     status = 'all',
     application_type = 'all',
+    sub_source_id,
+    sla_status,
   } = params
 
   return useQuery({
-    queryKey: ['clients', { page, page_size, search, status, application_type }],
+    queryKey: ['clients', { page, page_size, search, status, application_type, sub_source_id, sla_status }],
     queryFn: async (): Promise<PaginatedResponse<ClientListItem>> => {
       return await api.get<PaginatedResponse<ClientListItem>>('/clients/', {
         page,
@@ -39,6 +43,8 @@ export function useClients(params: ClientsQueryParams = {}) {
         search: search || undefined,
         status: status !== 'all' ? status : undefined,
         application_type: application_type !== 'all' ? application_type : undefined,
+        sub_source_id: sub_source_id || undefined,
+        sla_status: sla_status || undefined,
       })
     },
   })
@@ -102,6 +108,8 @@ export function useUpdateClient() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] })
       queryClient.invalidateQueries({ queryKey: ['clients', variables.id] })
+      // Invalidate documents cache since profile change affects required documents
+      queryClient.invalidateQueries({ queryKey: ['clientDocuments', variables.id] })
     },
   })
 }
@@ -297,9 +305,6 @@ export function calculateEligibility(data: {
   if (!monthly_salary || monthly_salary <= 0) {
     missingRequirements.push('Monthly salary is required')
   }
-  if (dbrAvailable <= 0) {
-    missingRequirements.push('DBR must be positive (reduce liabilities or increase income)')
-  }
   if (ltvPercentage > ltvLimit) {
     missingRequirements.push(`LTV ${ltvPercentage.toFixed(1)}% exceeds limit of ${ltvLimit}%`)
   }
@@ -328,4 +333,48 @@ export function calculateEligibility(data: {
     canCreateCase,
     missingRequirements,
   }
+}
+
+/**
+ * Hook for fetching client extra details.
+ */
+export function useClientExtraDetails(clientId: string | null) {
+  return useQuery({
+    queryKey: ['clientExtraDetails', clientId],
+    queryFn: async () => {
+      const data = await api.get<ClientExtraDetailsData | Record<string, never>>(`/clients/${clientId}/extra_details/`)
+      // API returns empty object {} if no extra details exist
+      if (!data || Object.keys(data).length === 0) {
+        return null
+      }
+      return data as ClientExtraDetailsData
+    },
+    enabled: !!clientId && clientId !== 'new',
+  })
+}
+
+/**
+ * Hook for updating client extra details.
+ */
+export function useUpdateClientExtraDetails() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ clientId, data }: { clientId: string; data: UpdateClientExtraDetailsData }) => {
+      try {
+        return await api.patch<ClientExtraDetailsData>(`/clients/${clientId}/extra_details/`, data)
+      } catch (error) {
+        if (error instanceof ApiError) {
+          throw new Error(
+            (error.data as { error?: string })?.error || 'Failed to update extra details'
+          )
+        }
+        throw error
+      }
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['clientExtraDetails', variables.clientId] })
+      queryClient.invalidateQueries({ queryKey: ['clients', variables.clientId] })
+    },
+  })
 }

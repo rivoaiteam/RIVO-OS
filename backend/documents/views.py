@@ -9,9 +9,8 @@ import logging
 
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes as perm_classes
+from rest_framework.decorators import api_view, permission_classes as perm_classes
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
 
 from clients.models import Client, ApplicationType
 from cases.models import Case
@@ -32,7 +31,7 @@ from documents.serializers import (
     CaseDocumentSerializer,
     CaseDocumentCreateSerializer,
 )
-from documents.storage import upload_file, delete_file
+from documents.storage import upload_file
 from users.permissions import IsAuthenticated
 
 logger = logging.getLogger(__name__)
@@ -252,22 +251,32 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
             - is_joint_application: Boolean
             - category: The document category based on client profile
             - conditional: List of conditional documents
+            - custom: List of custom document types for this client
         """
         client = self.get_client()
 
         # Get document category based on client's profile
         category = get_client_document_category(client)
 
-        # Get client-level document types for this category
+        # Get client-level document types for this category (system types only, no client-specific)
         document_types = DocumentType.objects.filter(
             level=DocumentLevel.CLIENT,
-            category=category
+            category=category,
+            client__isnull=True  # Only system types
         ).order_by('display_order', 'name')
 
-        # Get conditional documents (client-level)
+        # Get conditional documents (client-level, system types only)
         conditional_types = DocumentType.objects.filter(
             level=DocumentLevel.CLIENT,
-            category=DocumentCategory.CONDITIONAL
+            category=DocumentCategory.CONDITIONAL,
+            client__isnull=True  # Only system types
+        ).order_by('display_order', 'name')
+
+        # Get custom document types for this specific client
+        custom_types = DocumentType.objects.filter(
+            level=DocumentLevel.CLIENT,
+            client=client,
+            is_system=False
         ).order_by('display_order', 'name')
 
         # Get uploaded documents for this client
@@ -311,6 +320,18 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
                 'is_uploaded': doc is not None,
             })
 
+        # Build custom checklist for client-specific custom document types
+        custom_checklist = []
+        for doc_type in custom_types:
+            doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY))
+            if doc:
+                matched_doc_names.add((doc.document_type.name, ApplicantRole.PRIMARY))
+            custom_checklist.append({
+                'document_type': DocumentTypeSerializer(doc_type).data,
+                'document': ClientDocumentSerializer(doc).data if doc else None,
+                'is_uploaded': doc is not None,
+            })
+
         # Build checklist for co-applicant (if joint application)
         co_applicant_checklist = None
         is_joint = client.application_type == ApplicationType.JOINT
@@ -346,6 +367,7 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
             'primary': primary_checklist,
             'co_applicant': co_applicant_checklist,
             'conditional': conditional_checklist,
+            'custom': custom_checklist,  # Client-specific custom document types
             'other_documents': other_documents,  # Docs from previous profile
             'is_joint_application': is_joint,
             'category': category,
@@ -394,11 +416,22 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
         Delete a client document.
 
         DELETE /clients/{client_id}/documents/{id}
+
+        If the document uses a custom (non-system) document type that is
+        client-specific, the document type is also deleted.
         """
         document = get_object_or_404(self.get_queryset(), pk=pk)
+        document_type = document.document_type
 
         try:
+            # Delete the document first
             document.delete()
+
+            # If this was a custom document type (client-specific, non-system),
+            # delete the document type as well
+            if document_type.client_id and not document_type.is_system:
+                document_type.delete()
+
             return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             logger.error(f'Client document deletion failed: {str(e)}')
@@ -453,9 +486,12 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
         """
         case = self.get_case()
 
-        # Get all case-level document types
+        # Get case-level document types (bank forms only, exclude conditional)
+        from django.db.models import Q
         document_types = DocumentType.objects.filter(
             level=DocumentLevel.CASE
+        ).filter(
+            Q(category__isnull=True) | Q(category='')
         ).order_by('display_order', 'name')
 
         # Get uploaded documents for this case

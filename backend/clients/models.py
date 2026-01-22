@@ -14,13 +14,13 @@ from django.db import models
 from django.utils import timezone
 
 from audit.models import AuditableModel
-from acquisition_channels.models import SubSource
+from channels.models import SubSource
+from common.sla import format_sla_duration
 
 
 class ClientStatus(models.TextChoices):
     """Status choices for clients."""
     ACTIVE = 'active', 'Active'
-    CONVERTED = 'converted', 'Converted'
     DECLINED = 'declined', 'Declined'
     NOT_PROCEEDING = 'not_proceeding', 'Not Proceeding'
 
@@ -74,6 +74,33 @@ class Timeline(models.TextChoices):
     ONE_THREE_MONTHS = '1_3_months', '1-3 Months'
     THREE_SIX_MONTHS = '3_6_months', '3-6 Months'
     EXPLORING = 'exploring', 'Exploring'
+
+
+class MaritalStatus(models.TextChoices):
+    """Marital status choices."""
+    SINGLE = 'single', 'Single'
+    MARRIED = 'married', 'Married'
+    DIVORCED = 'divorced', 'Divorced'
+    WIDOWED = 'widowed', 'Widowed'
+
+
+
+
+class PropertyCategory(models.TextChoices):
+    """Property category choices."""
+    RESIDENTIAL = 'residential', 'Residential'
+    COMMERCIAL = 'commercial', 'Commercial'
+
+
+class Emirate(models.TextChoices):
+    """Emirate choices."""
+    DUBAI = 'dubai', 'Dubai'
+    ABU_DHABI = 'abu_dhabi', 'Abu Dhabi'
+    SHARJAH = 'sharjah', 'Sharjah'
+    AJMAN = 'ajman', 'Ajman'
+    RAS_AL_KHAIMAH = 'ras_al_khaimah', 'Ras Al Khaimah'
+    UMM_AL_QUWAIN = 'umm_al_quwain', 'Umm Al Quwain'
+    FUJAIRAH = 'fujairah', 'Fujairah'
 
 
 class Client(AuditableModel):
@@ -250,6 +277,74 @@ class Client(AuditableModel):
         help_text='Existing mortgage EMI (optional)'
     )
 
+    # Property Details
+    property_category = models.CharField(
+        max_length=20,
+        choices=PropertyCategory.choices,
+        default=PropertyCategory.RESIDENTIAL,
+        help_text='Property category (residential/commercial)'
+    )
+
+    property_type = models.CharField(
+        max_length=20,
+        choices=PropertyType.choices,
+        default=PropertyType.READY,
+        help_text='Property type (ready/off-plan)'
+    )
+
+    emirate = models.CharField(
+        max_length=20,
+        choices=Emirate.choices,
+        default=Emirate.DUBAI,
+        help_text='Emirate where property is located'
+    )
+
+    transaction_type = models.CharField(
+        max_length=20,
+        choices=TransactionType.choices,
+        default=TransactionType.PRIMARY_PURCHASE,
+        help_text='Type of transaction'
+    )
+
+    property_value = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Property value in AED'
+    )
+
+    is_first_property = models.BooleanField(
+        default=True,
+        help_text='Whether this is the client\'s first property in UAE'
+    )
+
+    developer = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Developer name (for off-plan properties)'
+    )
+
+    # Loan Details
+    loan_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Requested loan amount in AED'
+    )
+
+    tenure_years = models.PositiveIntegerField(
+        default=20,
+        help_text='Loan tenure in years (1-25)'
+    )
+
+    tenure_months = models.PositiveIntegerField(
+        default=0,
+        help_text='Additional months for loan tenure (0-11)'
+    )
+
     # Intent
     notes = models.TextField(
         blank=True,
@@ -379,24 +474,9 @@ class Client(AuditableModel):
         is_overdue = remaining_minutes < 0
 
         if is_overdue:
-            overdue_minutes = abs(remaining_minutes)
-            if overdue_minutes >= 1440:  # 24 hours
-                days = overdue_minutes // 1440
-                display = f"Overdue {days} day{'s' if days > 1 else ''}"
-            elif overdue_minutes >= 60:
-                hours = overdue_minutes // 60
-                display = f"Overdue {hours} hr{'s' if hours > 1 else ''}"
-            else:
-                display = f"Overdue {overdue_minutes} min{'s' if overdue_minutes > 1 else ''}"
+            display = format_sla_duration(abs(remaining_minutes), 'overdue')
         else:
-            if remaining_minutes >= 1440:  # 24 hours
-                days = remaining_minutes // 1440
-                display = f"{days} day{'s' if days > 1 else ''} left"
-            elif remaining_minutes >= 60:
-                hours = remaining_minutes // 60
-                display = f"{hours} hr{'s' if hours > 1 else ''} left"
-            else:
-                display = f"{remaining_minutes} min left"
+            display = format_sla_duration(remaining_minutes, 'remaining')
 
         return {
             'effective_sla_minutes': sla_minutes,
@@ -407,18 +487,36 @@ class Client(AuditableModel):
         }
 
     @property
-    def first_contact_sla_status(self) -> dict:
+    def is_terminal(self) -> bool:
+        """Check if client is in a terminal state (declined, not_proceeding)."""
+        return self.status in [ClientStatus.DECLINED, ClientStatus.NOT_PROCEEDING]
+
+    @property
+    def first_contact_sla_status(self) -> dict | None:
         """
         Calculate First Contact SLA status.
 
-        Uses the existing sla_timer logic from Channel/Source/SubSource configuration.
+        Only applies to clients converted from leads.
+        Clients created directly from trusted channels do not have First Contact SLA.
 
         Returns:
-            dict with keys:
-                - status: 'ok' | 'warning' | 'overdue'
+            dict with keys or None if not applicable:
+                - status: 'ok' | 'warning' | 'overdue' | 'completed'
                 - remaining_hours: int (negative if overdue)
                 - display: Human-readable string (e.g., "12h remaining", "2d overdue")
         """
+        # First Contact SLA only applies to clients converted from leads
+        if not self.converted_from_lead_id:
+            return None
+
+        # If client is terminal, SLA is completed
+        if self.is_terminal:
+            return {
+                'status': 'completed',
+                'remaining_hours': 0,
+                'display': 'Completed'
+            }
+
         # If first contact is already completed, show completed status
         if self.first_contact_completed_at:
             return {
@@ -444,29 +542,13 @@ class Client(AuditableModel):
         # Determine status based on thresholds
         if remaining_minutes < 0:
             status = 'overdue'
-            overdue_minutes = abs(remaining_minutes)
-            if overdue_minutes >= 1440:  # 24 hours
-                days = overdue_minutes // 1440
-                display = f"{days}d overdue"
-            else:
-                hours = overdue_minutes // 60
-                display = f"{hours}h overdue" if hours > 0 else f"{overdue_minutes}m overdue"
+            display = format_sla_duration(abs(remaining_minutes), 'overdue')
         elif remaining_minutes < (sla_minutes * 0.5):  # Less than 50% remaining
             status = 'warning'
-            if remaining_minutes >= 1440:
-                days = remaining_minutes // 1440
-                display = f"{days}d remaining"
-            else:
-                hours = remaining_minutes // 60
-                display = f"{hours}h remaining" if hours > 0 else f"{remaining_minutes}m remaining"
+            display = format_sla_duration(remaining_minutes, 'remaining')
         else:
             status = 'ok'
-            if remaining_minutes >= 1440:
-                days = remaining_minutes // 1440
-                display = f"{days}d remaining"
-            else:
-                hours = remaining_minutes // 60
-                display = f"{hours}h remaining" if hours > 0 else f"{remaining_minutes}m remaining"
+            display = format_sla_duration(remaining_minutes, 'remaining')
 
         return {
             'status': status,
@@ -475,25 +557,30 @@ class Client(AuditableModel):
         }
 
     @property
-    def client_to_case_sla_status(self) -> dict:
+    def client_to_case_sla_status(self) -> dict | None:
         """
         Calculate Client-to-Case SLA status.
 
-        Only computes if first_contact_completed_at is set.
+        Only applies to direct clients (from trusted channels).
+        Clients converted from leads use First Contact SLA instead.
         Uses ClientToCaseSLAConfig for SLA hours (default 168h = 7 days).
 
         Returns:
-            dict with keys:
-                - status: 'ok' | 'warning' | 'overdue' | 'not_started'
-                - remaining_hours: int (negative if overdue), None if not started
+            dict with keys or None if not applicable:
+                - status: 'ok' | 'warning' | 'overdue' | 'completed'
+                - remaining_hours: int (negative if overdue)
                 - display: Human-readable string
         """
-        # Only compute if first contact is completed
-        if not self.first_contact_completed_at:
+        # Client to Case SLA only applies to direct clients (not converted from leads)
+        if self.converted_from_lead_id:
+            return None
+
+        # If client is terminal, SLA is completed
+        if self.is_terminal:
             return {
-                'status': 'not_started',
-                'remaining_hours': None,
-                'display': 'Awaiting first contact'
+                'status': 'completed',
+                'remaining_hours': 0,
+                'display': 'Completed'
             }
 
         # Check if a case already exists for this client
@@ -501,16 +588,19 @@ class Client(AuditableModel):
             return {
                 'status': 'completed',
                 'remaining_hours': 0,
-                'display': 'Case created'
+                'display': 'Completed'
             }
+
+        # Direct client from trusted channel: SLA starts from creation
+        sla_start = self.created_at
 
         # Get SLA configuration
         from cases.models import ClientToCaseSLAConfig
         config = ClientToCaseSLAConfig.get_config()
         sla_hours = config.sla_hours
 
-        # Calculate deadline from first_contact_completed_at
-        deadline = self.first_contact_completed_at + timedelta(hours=sla_hours)
+        # Calculate deadline from SLA start time
+        deadline = sla_start + timedelta(hours=sla_hours)
         now = timezone.now()
         remaining = deadline - now
         remaining_minutes = int(remaining.total_seconds() / 60)
@@ -520,29 +610,13 @@ class Client(AuditableModel):
         # Determine status based on thresholds
         if remaining_minutes < 0:
             status = 'overdue'
-            overdue_minutes = abs(remaining_minutes)
-            if overdue_minutes >= 1440:  # 24 hours
-                days = overdue_minutes // 1440
-                display = f"{days}d overdue"
-            else:
-                hours = overdue_minutes // 60
-                display = f"{hours}h overdue" if hours > 0 else f"{overdue_minutes}m overdue"
+            display = format_sla_duration(abs(remaining_minutes), 'overdue')
         elif remaining_minutes < (sla_minutes * 0.5):  # Less than 50% remaining
             status = 'warning'
-            if remaining_minutes >= 1440:
-                days = remaining_minutes // 1440
-                display = f"{days}d remaining"
-            else:
-                hours = remaining_minutes // 60
-                display = f"{hours}h remaining" if hours > 0 else f"{remaining_minutes}m remaining"
+            display = format_sla_duration(remaining_minutes, 'remaining')
         else:
             status = 'ok'
-            if remaining_minutes >= 1440:
-                days = remaining_minutes // 1440
-                display = f"{days}d remaining"
-            else:
-                hours = remaining_minutes // 60
-                display = f"{hours}h remaining" if hours > 0 else f"{remaining_minutes}m remaining"
+            display = format_sla_duration(remaining_minutes, 'remaining')
 
         return {
             'status': status,
@@ -554,8 +628,8 @@ class Client(AuditableModel):
         """Validate model fields."""
         super().clean()
 
-        # Validate sub_source belongs to trusted channel OR client was converted from lead
-        if self.sub_source_id:
+        # Only validate sub_source on creation (not on updates)
+        if self._state.adding and self.sub_source_id:
             try:
                 sub_source = SubSource.objects.select_related(
                     'source__channel'
@@ -632,6 +706,16 @@ class Client(AuditableModel):
                 pass
         return total
 
+    def _get_total_income(self) -> Decimal:
+        """
+        Get total income including salary, addbacks, and co-applicant salary.
+        Used for DBR and max loan calculations.
+        """
+        total = self._get_combined_salary()
+        if self.total_addbacks:
+            total += self.total_addbacks
+        return total
+
     def _get_combined_liabilities(self) -> Decimal:
         """Get combined liabilities for single or joint application."""
         total = self.total_monthly_liabilities
@@ -648,36 +732,135 @@ class Client(AuditableModel):
     def dbr_available(self) -> Decimal:
         """
         Calculate DBR (Debt Burden Ratio) available.
-        Formula: (Combined Salary / 2) - Combined Liabilities
-        For joint applications, combines both applicants' financials.
+        Formula: (Total Income / 2) - Combined Liabilities
+        Total Income = Salary + Addbacks + Co-applicant Salary (if joint)
         """
-        combined_salary = self._get_combined_salary()
-        if not combined_salary or combined_salary <= 0:
+        total_income = self._get_total_income()
+        if not total_income or total_income <= 0:
             return Decimal('0.00')
 
         combined_liabilities = self._get_combined_liabilities()
-        half_salary = combined_salary / Decimal('2')
-        return half_salary - combined_liabilities
+        half_income = total_income / Decimal('2')
+        return half_income - combined_liabilities
 
     @property
     def max_loan_amount(self) -> Decimal:
         """
         Calculate maximum loan amount.
-        Formula: Combined Monthly Salary * 68
-        For joint applications, uses combined salary.
+        Formula: Total Income * 68
+        Total Income = Salary + Addbacks + Co-applicant Salary (if joint)
         """
-        combined_salary = self._get_combined_salary()
-        if not combined_salary:
+        total_income = self._get_total_income()
+        if not total_income:
             return Decimal('0.00')
-        return combined_salary * Decimal('68')
+        return total_income * Decimal('68')
 
     @property
-    def can_create_case(self) -> bool:
+    def ltv(self) -> Decimal | None:
+        """
+        Calculate LTV (Loan to Value) ratio.
+        Formula: (Loan Amount / Property Value) * 100
+        Returns None if property_value or loan_amount is not set.
+        """
+        if not self.property_value or not self.loan_amount:
+            return None
+        if self.property_value <= 0:
+            return None
+        return (self.loan_amount / self.property_value) * Decimal('100')
+
+    @property
+    def ltv_limit(self) -> int:
+        """
+        Get LTV limit based on property type and first property status.
+        - Off-plan: 50%
+        - Ready, first property: 80%
+        - Ready, second+ property: 65%
+        """
+        if self.property_type == PropertyType.OFF_PLAN:
+            return 50
+        return 80 if self.is_first_property else 65
+
+    @property
+    def ltv_status(self) -> dict:
+        """
+        Get LTV status with value, limit, and whether it's within limit.
+        """
+        ltv_value = self.ltv
+        ltv_limit = self.ltv_limit
+
+        if ltv_value is None:
+            return {
+                'ltv': None,
+                'limit': ltv_limit,
+                'within_limit': None,
+                'display': '-'
+            }
+
+        within_limit = ltv_value <= ltv_limit
+        return {
+            'ltv': float(ltv_value),
+            'limit': ltv_limit,
+            'within_limit': within_limit,
+            'display': f"{ltv_value:.1f}%"
+        }
+
+    @property
+    def can_create_case(self) -> dict:
         """
         Check if client can create a case.
-        Simple check: must have positive DBR.
+        Checks all required fields are filled.
+
+        Returns:
+            dict with 'valid' (bool) and 'reasons' (list of missing fields)
         """
-        return self.dbr_available > 0
+        reasons = []
+
+        # Required client fields
+        if not self.name:
+            reasons.append('Name is required')
+        if not self.phone:
+            reasons.append('Phone is required')
+        if not self.email:
+            reasons.append('Email is required')
+        if not self.date_of_birth:
+            reasons.append('Date of birth is required')
+        if not self.nationality:
+            reasons.append('Nationality is required')
+        if not self.residency:
+            reasons.append('Residency is required')
+        if not self.employment_type:
+            reasons.append('Employment type is required')
+        if not self.monthly_salary or self.monthly_salary <= 0:
+            reasons.append('Monthly salary is required')
+
+        # Property and loan details required for case creation
+        if self.property_value is None or self.property_value <= Decimal('0'):
+            reasons.append('Property value is required')
+        if self.loan_amount is None or self.loan_amount <= Decimal('0'):
+            reasons.append('Loan amount is required')
+
+        # For joint applications, must have co-applicant with required fields
+        if self.application_type == ApplicationType.JOINT:
+            try:
+                co_applicant = self.co_applicant
+                if not co_applicant:
+                    reasons.append('Co-applicant is required for joint application')
+                else:
+                    if not co_applicant.name:
+                        reasons.append('Co-applicant name is required')
+                    if not co_applicant.phone:
+                        reasons.append('Co-applicant phone is required')
+                    if not co_applicant.email:
+                        reasons.append('Co-applicant email is required')
+                    if not co_applicant.monthly_salary or co_applicant.monthly_salary <= 0:
+                        reasons.append('Co-applicant monthly salary is required')
+            except CoApplicant.DoesNotExist:
+                reasons.append('Co-applicant is required for joint application')
+
+        return {
+            'valid': len(reasons) == 0,
+            'reasons': reasons
+        }
 
     def mark_first_contact_complete(self) -> None:
         """
@@ -898,3 +1081,225 @@ class CoApplicant(AuditableModel):
     def total_monthly_liabilities(self) -> Decimal:
         """Calculate total monthly liabilities."""
         return self.total_cc_liability + self.total_loan_emis
+
+
+class ClientExtraDetails(AuditableModel):
+    """
+    Extra details for client - supplementary information for bank forms.
+
+    Contains personal, work, address, and reference information that
+    varies based on residency and employment type. Stored separately
+    to keep the Client model clean.
+    """
+
+    # Primary key
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text='Unique identifier'
+    )
+
+    # Link to client (OneToOne ensures only one extra details per client)
+    client = models.OneToOneField(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='extra_details',
+        help_text='The client this extra details belongs to'
+    )
+
+    # Personal Information
+    marital_status = models.CharField(
+        max_length=20,
+        choices=MaritalStatus.choices,
+        blank=True,
+        default='',
+        help_text='Marital status'
+    )
+
+    spouse_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Spouse name (if married)'
+    )
+
+    spouse_contact = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        help_text='Spouse contact number'
+    )
+
+    dependents = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Number of dependents'
+    )
+
+    children_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Number of children'
+    )
+
+    children_in_school = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Number of children in school'
+    )
+
+    qualification = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Education qualification'
+    )
+
+    mailing_address = models.TextField(
+        blank=True,
+        default='',
+        help_text='Mailing/correspondence address'
+    )
+
+    mother_maiden_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Mother\'s maiden name (for bank security)'
+    )
+
+    # Work Details
+    job_title = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Job title (salaried)'
+    )
+
+    company_industry = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Company industry/sector'
+    )
+
+    years_in_occupation = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Years in current occupation (salaried)'
+    )
+
+    years_in_current_company = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Years in current company (salaried)'
+    )
+
+    years_in_business = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Years in business (self-employed)'
+    )
+
+    company_employee_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Number of employees in organization'
+    )
+
+    office_address = models.TextField(
+        blank=True,
+        default='',
+        help_text='Office address'
+    )
+
+    office_po_box = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text='Office PO Box'
+    )
+
+    office_landline = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text='Office landline number'
+    )
+
+    work_email = models.EmailField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Work email address (salaried)'
+    )
+
+    company_hr_email = models.EmailField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Company HR email for verification (salaried)'
+    )
+
+    # References (2 people)
+    ref_1_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Reference 1 name'
+    )
+
+    ref_1_relationship = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Reference 1 relationship'
+    )
+
+    ref_1_mobile = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text='Reference 1 mobile'
+    )
+
+    ref_2_name = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Reference 2 name'
+    )
+
+    ref_2_relationship = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Reference 2 relationship'
+    )
+
+    ref_2_mobile = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        help_text='Reference 2 mobile'
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When the extra details were created'
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text='When the extra details were last updated'
+    )
+
+    class Meta:
+        db_table = 'client_extra_details'
+        verbose_name = 'Client Extra Details'
+        verbose_name_plural = 'Client Extra Details'
+
+    def __str__(self) -> str:
+        return f"Extra Details for {self.client.name}"

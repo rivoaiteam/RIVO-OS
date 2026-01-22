@@ -140,8 +140,13 @@ class SubSourceViewSet(viewsets.ModelViewSet):
     """
 
     queryset = SubSource.objects.all().select_related('source__channel', 'linked_user')
-    permission_classes = [IsAdminRole]
     serializer_class = SubSourceSerializer
+
+    def get_permissions(self):
+        """Allow ms_users and for_filter for all authenticated users, rest admin only."""
+        if self.action in ['ms_users', 'for_filter']:
+            return [IsAuthenticated()]
+        return [IsAdminRole()]
 
     def partial_update(self, request, pk=None):
         """Update sub-source."""
@@ -170,3 +175,40 @@ class SubSourceViewSet(viewsets.ModelViewSet):
         )
         serializer = MSUserSerializer(ms_users, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def for_filter(self, request):
+        """
+        Get sub-sources for filter dropdowns.
+
+        Query params:
+        - trust: 'trusted', 'untrusted', or 'all' (default: 'all')
+
+        Returns flat list of sub-sources with source and channel info.
+        """
+        trust_filter = request.query_params.get('trust', 'all')
+
+        queryset = SubSource.objects.select_related(
+            'source__channel'
+        ).filter(
+            source__is_active=True,
+            source__channel__is_active=True
+        ).order_by('source__channel__name', 'source__name', 'name')
+
+        if trust_filter == 'trusted':
+            queryset = queryset.filter(source__channel__is_trusted=True)
+        elif trust_filter == 'untrusted':
+            queryset = queryset.filter(source__channel__is_trusted=False)
+
+        result = []
+        for sub_source in queryset:
+            result.append({
+                'id': str(sub_source.id),
+                'name': sub_source.name,
+                'source_name': sub_source.source.name,
+                'channel_name': sub_source.source.channel.name,
+                'is_trusted': sub_source.source.channel.is_trusted,
+            })
+
+        return Response(result)
+

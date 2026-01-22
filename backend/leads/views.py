@@ -7,7 +7,9 @@ and status management actions.
 
 import logging
 
-from django.db.models import Q
+from django.db.models import Q, F, ExpressionWrapper, DurationField
+from django.db.models.functions import Now
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -70,7 +72,7 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     queryset = Lead.objects.select_related(
         'sub_source__source__channel'
-    ).all().order_by('-created_at')
+    ).filter(converted_client_id__isnull=True).order_by('-created_at')
     permission_classes = [IsAuthenticated]
     pagination_class = LeadPagination
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
@@ -224,8 +226,12 @@ class LeadViewSet(viewsets.ModelViewSet):
         new_status = serializer.validated_data['status']
 
         try:
-            # Update status (bypass full_clean for status-only changes)
-            Lead.objects.filter(pk=lead.pk).update(status=new_status)
+            # Update status and updated_at (bypass full_clean for status-only changes)
+            from django.utils import timezone
+            Lead.objects.filter(pk=lead.pk).update(
+                status=new_status,
+                updated_at=timezone.now()
+            )
             lead.refresh_from_db()
 
             return Response(LeadDetailSerializer(lead).data)

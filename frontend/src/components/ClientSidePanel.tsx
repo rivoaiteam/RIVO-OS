@@ -13,19 +13,26 @@ import {
   useUpdateCoApplicant,
   useChangeClientStatus,
 } from '@/hooks/useClients'
+import { useSourcesForFilter } from '@/hooks/useChannels'
+import { clientToast } from '@/lib/toastMessages'
+import { FormField } from '@/components/ui/FormField'
+import { SidePanelWrapper } from '@/components/ui/SidePanelWrapper'
 import { CaseSidePanel } from '@/components/CaseSidePanel'
 import { ClientDocumentTab } from '@/components/documents'
+import { ClientExtraDetailsTab } from '@/components/ClientExtraDetailsTab'
 import { ActivityTimeline } from '@/components/activity'
 import { ClientWhatsAppTab } from '@/components/whatsapp/ClientWhatsAppTab'
 import { SLACountdown } from '@/components/SLACountdown'
-import { useChannels, type Channel } from '@/hooks/useChannels'
 import { useAuth } from '@/contexts/AuthContext'
-import { api } from '@/lib/api'
 import type {
   ResidencyType,
   EmploymentType,
   ClientStatus,
   SLAStatusValue,
+  PropertyCategory,
+  PropertyType,
+  Emirate,
+  TransactionType,
 } from '@/types/mortgage'
 import { cn } from '@/lib/utils'
 
@@ -36,11 +43,10 @@ interface ClientSidePanelProps {
   viewOnly?: boolean
 }
 
-type TabType = 'details' | 'documents' | 'activity' | 'whatsapp'
+type TabType = 'details' | 'extra_details' | 'documents' | 'activity' | 'whatsapp'
 
 const statusColors: Record<ClientStatus, string> = {
   active: 'bg-green-100 text-green-700',
-  converted: 'bg-emerald-100 text-emerald-700',
   declined: 'bg-red-100 text-red-700',
   not_proceeding: 'bg-gray-200 text-gray-500',
 }
@@ -54,6 +60,34 @@ const residencyOptions: { value: ResidencyType; label: string }[] = [
 const employmentOptions: { value: EmploymentType; label: string }[] = [
   { value: 'salaried', label: 'Salaried' },
   { value: 'self_employed', label: 'Self Employed' },
+]
+
+const propertyCategoryOptions: { value: PropertyCategory; label: string }[] = [
+  { value: 'residential', label: 'Residential' },
+  { value: 'commercial', label: 'Commercial' },
+]
+
+const propertyTypeOptions: { value: PropertyType; label: string }[] = [
+  { value: 'ready', label: 'Ready' },
+  { value: 'off_plan', label: 'Off-Plan' },
+]
+
+const emirateOptions: { value: Emirate; label: string }[] = [
+  { value: 'dubai', label: 'Dubai' },
+  { value: 'abu_dhabi', label: 'Abu Dhabi' },
+  { value: 'sharjah', label: 'Sharjah' },
+  { value: 'ajman', label: 'Ajman' },
+  { value: 'ras_al_khaimah', label: 'Ras Al Khaimah' },
+  { value: 'fujairah', label: 'Fujairah' },
+  { value: 'umm_al_quwain', label: 'Umm Al Quwain' },
+]
+
+const transactionTypeOptions: { value: TransactionType; label: string }[] = [
+  { value: 'primary_purchase', label: 'Primary Purchase' },
+  { value: 'resale', label: 'Resale' },
+  { value: 'buyout_equity', label: 'Buyout + Equity' },
+  { value: 'buyout', label: 'Buyout' },
+  { value: 'equity', label: 'Equity' },
 ]
 
 const UAE_BANKS = [
@@ -142,10 +176,26 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
   // Liabilities
   const [liabilities, setLiabilities] = useState<{ type: string; amount: string; bankName?: string }[]>([])
 
+  // Property fields
+  const [propertyCategory, setPropertyCategory] = useState<PropertyCategory>('residential')
+  const [propertyType, setPropertyType] = useState<PropertyType>('ready')
+  const [emirate, setEmirate] = useState<Emirate>('dubai')
+  const [transactionType, setTransactionType] = useState<TransactionType>('primary_purchase')
+  const [propertyValue, setPropertyValue] = useState('')
+  const [isFirstProperty, setIsFirstProperty] = useState(true)
+  // Loan fields
+  const [loanAmount, setLoanAmount] = useState('')
+  const [tenureYears, setTenureYears] = useState('20')
+  const [tenureMonths, setTenureMonths] = useState('0')
+
   const [saveError, setSaveError] = useState<string | null>(null)
   const [showCaseCreation, setShowCaseCreation] = useState(false)
   const [_hasChanges, _setHasChanges] = useState(false)
   const [initialLoadDone, setInitialLoadDone] = useState(false)
+
+  // Status confirmation modal state
+  const [showStatusConfirmation, setShowStatusConfirmation] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<ClientStatus | null>(null)
 
   const createMutation = useCreateClient()
   const updateMutation = useUpdateClient()
@@ -206,6 +256,20 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
         setCoBorrowerEmail(client.co_applicant.email || '')
         setCoBorrowerSalary(client.co_applicant.monthly_salary || '')
       }
+
+      // Property fields
+      setPropertyCategory(client.property_category || 'residential')
+      setPropertyType(client.property_type || 'ready')
+      setEmirate(client.emirate || 'dubai')
+      setTransactionType(client.transaction_type || 'primary_purchase')
+      setPropertyValue(client.property_value || '')
+      setIsFirstProperty(client.is_first_property ?? true)
+
+      // Loan fields
+      setLoanAmount(client.loan_amount || '')
+      setTenureYears(String(client.tenure_years ?? 20))
+      setTenureMonths(String(client.tenure_months ?? 0))
+
       // Mark initial load as done (with slight delay to avoid immediate change detection)
       setTimeout(() => setInitialLoadDone(true), 100)
     }
@@ -272,6 +336,26 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
     }
   }, [monthlySalary, totalAddbacks, coBorrowerSalary, applicationType, liabilities])
 
+  // LTV Calculation
+  const ltvCalculation = useMemo(() => {
+    const loan = parseFloat(loanAmount) || 0
+    const property = parseFloat(propertyValue) || 0
+
+    // Calculate LTV limit based on property type and first property status
+    const ltvLimit = propertyType === 'off_plan' ? 50 : (isFirstProperty ? 80 : 65)
+
+    if (property <= 0 || loan <= 0) {
+      return { ltv: 0, ltvLimit, withinLimit: true }
+    }
+
+    const ltv = (loan / property) * 100
+    return {
+      ltv: Math.round(ltv * 100) / 100,
+      ltvLimit,
+      withinLimit: ltv <= ltvLimit
+    }
+  }, [loanAmount, propertyValue, propertyType, isFirstProperty])
+
   const handleSave = async () => {
     const errors: string[] = []
 
@@ -290,6 +374,10 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
 
     // Income
     if (!monthlySalary) errors.push('Monthly Salary is required')
+
+    // Property & Loan (required for case creation)
+    if (!propertyValue) errors.push('Property Value is required')
+    if (!loanAmount) errors.push('Loan Amount is required')
 
     // Co-borrower (if joint)
     if (applicationType === 'joint') {
@@ -333,7 +421,22 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       auto_loan_emi: autoLoan || undefined,
       personal_loan_emi: personalLoan || undefined,
       existing_mortgage_emi: mortgageEmi || undefined,
-      sub_source_id: subSourceId || undefined,
+      // Property fields
+      property_category: propertyCategory,
+      property_type: propertyType,
+      emirate: emirate,
+      transaction_type: transactionType,
+      property_value: propertyValue || undefined,
+      is_first_property: isFirstProperty,
+      // Loan fields
+      loan_amount: loanAmount || undefined,
+      tenure_years: parseInt(tenureYears) || 20,
+      tenure_months: parseInt(tenureMonths) || 0,
+    }
+
+    // Only include sub_source_id for create mode (not for updates, especially converted clients)
+    if (isCreateMode) {
+      data.sub_source_id = subSourceId || undefined
     }
 
     try {
@@ -363,23 +466,49 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
           },
         })
       }
-
-      onClose()
+      // Close panel after creating new client, stay open for updates
+      if (isCreateMode) {
+        onClose()
+      }
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save client')
     }
   }
 
-  const handleStatusChange = async (newStatus: ClientStatus) => {
+  const handleStatusChange = (newStatus: ClientStatus) => {
     if (!client) return
+    // Show confirmation for terminal statuses
+    if (newStatus === 'declined' || newStatus === 'not_proceeding') {
+      setPendingStatus(newStatus)
+      setShowStatusConfirmation(true)
+    } else {
+      confirmStatusChange(newStatus)
+    }
+  }
+
+  const confirmStatusChange = async (status: ClientStatus) => {
     try {
-      await changeStatusMutation.mutateAsync({ id: clientId, status: newStatus })
+      await changeStatusMutation.mutateAsync({ id: clientId, status })
+      clientToast.statusChanged(status)
+      setShowStatusConfirmation(false)
+      setPendingStatus(null)
+      onClose()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to change status')
     }
   }
 
+  const cancelStatusChange = () => {
+    setShowStatusConfirmation(false)
+    setPendingStatus(null)
+  }
+
   const handleConvertToCase = () => {
+    // Check API validation (saved data)
+    if (client?.can_create_case && !client.can_create_case.valid) {
+      setSaveError('Cannot create case: Required fields are empty')
+      return
+    }
     setShowCaseCreation(true)
   }
 
@@ -412,10 +541,11 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
 
   const isPending = createMutation.isPending || updateMutation.isPending || updateCoApplicantMutation.isPending
 
-  // Check if we should show SLA countdowns (only in edit mode with client data)
-  const showSLACountdowns = !isCreateMode && client
-  const firstContactSLA = client?.first_contact_sla_status
-  const clientToCaseSLA = client?.client_to_case_sla_status
+  // Check if we should show SLA countdown (only in edit mode with client data)
+  // Each client has only one SLA: First Contact (converted from lead) or Client to Case (direct)
+  const showSLACountdown = !isCreateMode && client
+  const clientSLA = client?.first_contact_sla_status || client?.client_to_case_sla_status
+  const slaLabel = client?.first_contact_sla_status ? 'First Contact SLA' : 'Client to Case SLA'
 
   return (
     <SidePanelWrapper onClose={onClose}>
@@ -427,9 +557,18 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
               {isCreateMode ? 'New Client' : (client?.name || 'Edit Client')}
             </h2>
             {!isCreateMode && client && (
-              client.status === 'converted' ? (
+              // Show badge (not editable) if client has cases or is in terminal status
+              client.cases && client.cases.length > 0 ? (
                 <span className={cn('px-2 py-0.5 text-xs font-medium rounded', statusColors[client.status])}>
-                  Converted
+                  {client.status === 'active' ? 'Active' : client.status === 'declined' ? 'Declined' : 'Not Proceeding'}
+                </span>
+              ) : client.status === 'declined' ? (
+                <span className={cn('px-2 py-0.5 text-xs font-medium rounded', statusColors[client.status])}>
+                  Declined
+                </span>
+              ) : client.status === 'not_proceeding' ? (
+                <span className={cn('px-2 py-0.5 text-xs font-medium rounded', statusColors[client.status])}>
+                  Not Proceeding
                 </span>
               ) : (
                 <select
@@ -454,28 +593,15 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
         </div>
 
         {/* SLA Countdown Section - Near top of panel */}
-        {showSLACountdowns && (firstContactSLA || clientToCaseSLA) && (
-          <div className="mt-3 flex flex-wrap gap-3">
-            {/* First Contact SLA - Always visible when available */}
-            {firstContactSLA && (
-              <SLACountdown
-                status={firstContactSLA.status as SLAStatusValue}
-                remainingHours={firstContactSLA.remaining_hours}
-                displayText={firstContactSLA.display}
-                label="First Contact SLA"
-                size="sm"
-              />
-            )}
-            {/* Client-to-Case SLA - Only show when first contact is completed */}
-            {clientToCaseSLA && clientToCaseSLA.status !== 'not_started' && (
-              <SLACountdown
-                status={clientToCaseSLA.status as SLAStatusValue}
-                remainingHours={clientToCaseSLA.remaining_hours}
-                displayText={clientToCaseSLA.display}
-                label="Client to Case SLA"
-                size="sm"
-              />
-            )}
+        {showSLACountdown && clientSLA && (
+          <div className="mt-3">
+            <SLACountdown
+              status={clientSLA.status as SLAStatusValue}
+              remainingHours={clientSLA.remaining_hours}
+              displayText={clientSLA.display}
+              label={slaLabel}
+              size="sm"
+            />
           </div>
         )}
 
@@ -499,6 +625,17 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
               )}
             >
               Details
+            </button>
+            <button
+              onClick={() => setActiveTab('extra_details')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'extra_details'
+                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
+                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              Extra Details
             </button>
             <button
               onClick={() => setActiveTab('documents')}
@@ -542,11 +679,11 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       {(isCreateMode || activeTab === 'details') && (
         <>
           {/* Form Content */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Personal Information */}
-            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Personal Information</h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white border border-gray-100 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Personal Information</h3>
+              <div className="grid grid-cols-2 gap-3">
                 <FormField label="First Name *">
                   <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
                     className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
@@ -556,16 +693,16 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
                     className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
                 </FormField>
                 <FormField label="Phone *">
-                  <div className="flex gap-2">
+                  <div className="flex gap-1">
                     <select
                       value={phoneCountryCode}
                       onChange={(e) => setPhoneCountryCode(e.target.value)}
-                      className="h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white w-28"
+                      className="h-9 px-1 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white w-20 shrink-0"
                     >
-                      {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+                      {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                     <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
-                      className="flex-1 h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                      className="flex-1 min-w-0 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
                   </div>
                 </FormField>
                 <FormField label="Email *">
@@ -596,14 +733,18 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
                   </select>
                 </FormField>
                 <FormField label="Source *" className="col-span-2">
-                  <TrustedSourceSelector value={subSourceId} onChange={setSubSourceId} />
+                  <TrustedSourceSelector
+                    value={subSourceId}
+                    onChange={setSubSourceId}
+                    currentSource={client?.sub_source}
+                  />
                 </FormField>
               </div>
             </div>
 
             {/* Application Type */}
-            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Application Type</h3>
+            <div className="bg-white border border-gray-100 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Application Type</h3>
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" checked={applicationType === 'single'} onChange={() => setApplicationType('single')}
@@ -656,8 +797,8 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
             </div>
 
             {/* Income & Liabilities */}
-            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Income & Liabilities</h3>
+            <div className="bg-white border border-gray-100 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Income & Liabilities</h3>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Monthly Salary (AED) *">
                   <input type="text" inputMode="numeric" value={monthlySalary} onChange={(e) => setMonthlySalary(sanitizeAmount(e.target.value))}
@@ -721,10 +862,88 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
               </div>
             </div>
 
+            {/* Property Details */}
+            <div className="bg-white border border-gray-100 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Property Details</h3>
+              <div className="grid grid-cols-3 gap-3">
+                <FormField label="Category">
+                  <select value={propertyCategory} onChange={(e) => setPropertyCategory(e.target.value as PropertyCategory)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                    {propertyCategoryOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Type">
+                  <select value={propertyType} onChange={(e) => setPropertyType(e.target.value as PropertyType)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                    {propertyTypeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Emirate">
+                  <select value={emirate} onChange={(e) => setEmirate(e.target.value as Emirate)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                    {emirateOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Transaction">
+                  <select value={transactionType} onChange={(e) => setTransactionType(e.target.value as TransactionType)}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                    {transactionTypeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Property Value (AED) *">
+                  <input type="text" inputMode="numeric" value={propertyValue} onChange={(e) => setPropertyValue(sanitizeAmount(e.target.value))}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+                <FormField label="First Property?">
+                  <div className="flex items-center gap-4 h-9">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" checked={isFirstProperty} onChange={() => setIsFirstProperty(true)}
+                        className="w-4 h-4 text-[#1e3a5f] focus:ring-[#1e3a5f]" />
+                      <span className="text-sm text-gray-700">Yes</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" checked={!isFirstProperty} onChange={() => setIsFirstProperty(false)}
+                        className="w-4 h-4 text-[#1e3a5f] focus:ring-[#1e3a5f]" />
+                      <span className="text-sm text-gray-700">No</span>
+                    </label>
+                  </div>
+                </FormField>
+              </div>
+            </div>
+
+            {/* Loan Details */}
+            <div className="bg-white border border-gray-100 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Loan Details</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Loan Amount (AED) *">
+                  <input type="text" inputMode="numeric" value={loanAmount} onChange={(e) => setLoanAmount(sanitizeAmount(e.target.value))}
+                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                </FormField>
+                <FormField label="Tenure">
+                  <div className="flex items-center gap-2">
+                    <select value={tenureYears} onChange={(e) => setTenureYears(e.target.value)}
+                      className="w-16 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                      {Array.from({ length: 25 }, (_, i) => i + 1).map(y => (
+                        <option key={y} value={String(y)}>{y}</option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-gray-500">yrs</span>
+                    <select value={tenureMonths} onChange={(e) => setTenureMonths(e.target.value)}
+                      className="w-14 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
+                      {Array.from({ length: 12 }, (_, i) => i).map(m => (
+                        <option key={m} value={String(m)}>{m}</option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-gray-500">mo</span>
+                  </div>
+                </FormField>
+              </div>
+            </div>
+
             {/* Eligibility Calculations */}
-            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Eligibility</h3>
-              <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white border border-gray-100 rounded-xl p-4">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Eligibility</h3>
+              <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-3 bg-gray-50 rounded-lg">
                   <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">DBR Available</span>
                   <span className={`text-sm font-bold ${calculations.dbrAvailable >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -735,12 +954,18 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
                   <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">Max Loan</span>
                   <span className="text-sm font-bold text-gray-900">AED {calculations.maxLoanAmount.toLocaleString()}</span>
                 </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">LTV ({ltvCalculation.ltvLimit}% max)</span>
+                  <span className={`text-sm font-bold ${ltvCalculation.withinLimit ? 'text-green-600' : 'text-red-600'}`}>
+                    {ltvCalculation.ltv > 0 ? `${ltvCalculation.ltv}%` : '-'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Footer - hidden in viewOnly mode */}
-          {!viewOnly && (
+          {/* Footer - only for create mode or active clients */}
+          {!viewOnly && (isCreateMode || (client && client.status === 'active')) && (
             <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 space-y-2">
               <button onClick={handleSave} disabled={isPending}
                 className="w-full py-2.5 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2d4a6f] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
@@ -750,7 +975,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
                   isCreateMode ? 'Create Client' : 'Save Changes'
                 )}
               </button>
-              {!isCreateMode && !hideCreateCase && client && client.status === 'active' && (
+              {!isCreateMode && !hideCreateCase && client && (
                 <button onClick={handleConvertToCase}
                   className="w-full py-2.5 border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
                   <Briefcase className="h-4 w-4" />
@@ -760,6 +985,17 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
             </div>
           )}
         </>
+      )}
+
+      {/* Extra Details Tab Content */}
+      {!isCreateMode && activeTab === 'extra_details' && client && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <ClientExtraDetailsTab
+            clientId={clientId}
+            employmentType={client.employment_type}
+            viewOnly={viewOnly}
+          />
+        </div>
       )}
 
       {/* Documents Tab Content */}
@@ -792,70 +1028,76 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
           preselectedClientId={clientId}
         />
       )}
+
+      {/* Status Confirmation Modal */}
+      {showStatusConfirmation && pendingStatus && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-[60]" onClick={cancelStatusChange} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[360px] bg-white z-[60] shadow-xl rounded-xl">
+            <div className="p-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">Confirm Status Change</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                You are about to change status to: <strong>{pendingStatus === 'declined' ? 'Declined' : 'Not Proceeding'}</strong>
+              </p>
+            </div>
+            <div className="p-4">
+              <div className="p-2.5 bg-amber-50 border border-amber-100 rounded-lg">
+                <p className="text-xs text-amber-700">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 p-4 pt-0">
+              <button
+                onClick={cancelStatusChange}
+                className="flex-1 px-4 py-2 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => pendingStatus && confirmStatusChange(pendingStatus)}
+                disabled={changeStatusMutation.isPending}
+                className="flex-1 px-4 py-2 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {changeStatusMutation.isPending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Updating...
+                  </span>
+                ) : (
+                  'Confirm'
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </SidePanelWrapper>
   )
 }
 
-function SidePanelWrapper({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-1/2 min-w-[480px] max-w-[800px] bg-white z-50 shadow-xl flex flex-col animate-slide-in-right">
-        {children}
-      </div>
-    </>
-  )
+interface TrustedSourceSelectorProps {
+  value: string
+  onChange: (id: string) => void
+  currentSource?: {
+    id: string
+    name: string
+    source_name: string
+  } | null
 }
 
-function FormField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      {children}
-    </div>
-  )
-}
+function TrustedSourceSelector({ value, onChange, currentSource }: TrustedSourceSelectorProps) {
+  const { data: sources, isLoading } = useSourcesForFilter('trusted')
 
-function TrustedSourceSelector({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  const { data: channels, isLoading } = useChannels()
-  const [subSources, setSubSources] = useState<Array<{ id: string; name: string; sourceName: string }>>([])
-  const [loadingSubSources, setLoadingSubSources] = useState(false)
+  if (isLoading && currentSource) {
+    return (
+      <select className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white" disabled>
+        <option>{currentSource.name} ({currentSource.source_name})</option>
+      </select>
+    )
+  }
 
-  useEffect(() => {
-    const fetchSubSources = async () => {
-      if (!channels || channels.length === 0) return
-
-      const trustedChannels = channels.filter(ch => ch.is_trusted)
-      if (trustedChannels.length === 0) return
-
-      setLoadingSubSources(true)
-      const allSubSources: Array<{ id: string; name: string; sourceName: string }> = []
-
-      for (const channel of trustedChannels) {
-        try {
-          const fullChannel = await api.get<Channel>(`/channels/${channel.id}/`)
-          for (const source of fullChannel.sources || []) {
-            for (const subSource of source.sub_sources || []) {
-              allSubSources.push({
-                id: subSource.id,
-                name: subSource.name,
-                sourceName: source.name,
-              })
-            }
-          }
-        } catch {
-          // Skip failed channels
-        }
-      }
-
-      setSubSources(allSubSources)
-      setLoadingSubSources(false)
-    }
-
-    fetchSubSources()
-  }, [channels])
-
-  if (isLoading || loadingSubSources) {
+  if (isLoading) {
     return (
       <select className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white" disabled>
         <option>Loading...</option>
@@ -863,11 +1105,18 @@ function TrustedSourceSelector({ value, onChange }: { value: string; onChange: (
     )
   }
 
+  const hasCurrentSource = currentSource && sources?.some(s => s.id === currentSource.id)
+
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
       className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none bg-white">
       <option value="">Select source...</option>
-      {subSources.map(opt => (
+      {currentSource && !hasCurrentSource && (
+        <option key={currentSource.id} value={currentSource.id}>
+          {currentSource.name} ({currentSource.source_name})
+        </option>
+      )}
+      {sources?.map(opt => (
         <option key={opt.id} value={opt.id}>{opt.name} ({opt.sourceName})</option>
       ))}
     </select>

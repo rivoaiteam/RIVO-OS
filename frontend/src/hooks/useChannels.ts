@@ -334,3 +334,44 @@ export function useMSUsers() {
     },
   })
 }
+
+/**
+ * Source filter option for dropdowns.
+ */
+export interface SourceFilterOption {
+  id: string
+  name: string
+  sourceName: string
+  channelName: string
+  isTrusted: boolean
+}
+
+interface SubSourceFilterResponse {
+  id: string
+  name: string
+  source_name: string
+  channel_name: string
+  is_trusted: boolean
+}
+
+/**
+ * Hook for fetching sources for filter dropdown.
+ * @param filter - 'trusted' for trusted only, 'untrusted' for untrusted only, 'all' for all sources
+ */
+export function useSourcesForFilter(filter: 'trusted' | 'untrusted' | 'all' = 'all') {
+  return useQuery({
+    queryKey: ['sources-filter', filter],
+    queryFn: async (): Promise<SourceFilterOption[]> => {
+      const response = await api.get<SubSourceFilterResponse[]>('/sub-sources/for_filter/', {
+        trust: filter,
+      })
+      return response.map((item) => ({
+        id: item.id,
+        name: item.name,
+        sourceName: item.source_name,
+        channelName: item.channel_name,
+        isTrusted: item.is_trusted,
+      }))
+    },
+  })
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, X, AlertCircle, Loader2, Search, Key, Eye, EyeOff, Check } from 'lucide-react'
+import { Plus, Trash2, X, Loader2, Search, Key, Eye, EyeOff, Check } from 'lucide-react'
 import {
   useUsers,
   useDeleteUser,
@@ -10,6 +10,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { UserSidePanel } from '@/components/UserSidePanel'
 import { Pagination } from '@/components/Pagination'
+import { TablePageLayout, TableCard, TableContainer, PageLoading, PageError, StatusErrorToast } from '@/components/ui/TablePageLayout'
 
 const STATUS_TABS: { value: 'all' | 'active' | 'inactive'; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -94,28 +95,11 @@ export function UsersPage() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="h-full bg-white flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="h-full bg-white flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <p className="text-gray-600">Failed to load users</p>
-          <p className="text-sm text-gray-400 mt-1">{error.message}</p>
-        </div>
-      </div>
-    )
-  }
+  if (isLoading) return <PageLoading />
+  if (error) return <PageError entityName="users" message={error.message} />
 
   return (
-    <div className="h-full">
+    <TablePageLayout>
       {/* Page Header */}
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
@@ -183,23 +167,13 @@ export function UsersPage() {
         </div>
       </div>
 
-      {/* Status Error Toast */}
       {statusError && (
-        <div className="mx-6 mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs flex items-center gap-2">
-          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-          {statusError}
-          <button
-            onClick={() => setStatusError(null)}
-            className="ml-auto text-red-400 hover:text-red-600"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        <StatusErrorToast message={statusError} onClose={() => setStatusError(null)} />
       )}
 
       {/* Users Table Card */}
-      <div className="mx-6 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 pt-4">
+      <TableCard>
+        <TableContainer isEmpty={users.length === 0} emptyMessage="No users found">
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
@@ -248,22 +222,16 @@ export function UsersPage() {
               ))}
             </tbody>
           </table>
+        </TableContainer>
 
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            onPageChange={setCurrentPage}
-            itemLabel="users"
-          />
-
-          {users.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-xs text-gray-500">No users found</p>
-            </div>
-          )}
-        </div>
-      </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          onPageChange={setCurrentPage}
+          itemLabel="users"
+        />
+      </TableCard>
 
       {/* System Password Modal */}
       {showSystemPasswordModal && (
@@ -277,7 +245,7 @@ export function UsersPage() {
           onClose={() => setSelectedUserId(null)}
         />
       )}
-    </div>
+    </TablePageLayout>
   )
 }
 

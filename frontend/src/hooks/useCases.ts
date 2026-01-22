@@ -16,6 +16,7 @@ import type {
 } from '@/types/mortgage'
 import {
   ACTIVE_STAGES,
+  QUERY_STAGES,
   HOLD_STAGES,
   TERMINAL_STAGES,
   CASE_STAGE_LABELS,
@@ -26,6 +27,10 @@ import {
  */
 export const CASE_STAGES = {
   active: ACTIVE_STAGES.map((stage) => ({
+    value: stage,
+    label: CASE_STAGE_LABELS[stage],
+  })),
+  query: QUERY_STAGES.map((stage) => ({
     value: stage,
     label: CASE_STAGE_LABELS[stage],
   })),
@@ -66,10 +71,10 @@ export function isTerminalStage(stage: CaseStage): boolean {
  * Hook for fetching paginated cases.
  */
 export function useCases(params: CasesQueryParams = {}) {
-  const { page = 1, page_size = 10, search = '', stage = 'all', bank } = params
+  const { page = 1, page_size = 10, search = '', stage = 'all', bank, sla_status } = params
 
   return useQuery({
-    queryKey: ['cases', { page, page_size, search, stage, bank }],
+    queryKey: ['cases', { page, page_size, search, stage, bank, sla_status }],
     queryFn: async (): Promise<PaginatedResponse<CaseListItem>> => {
       return await api.get<PaginatedResponse<CaseListItem>>('/cases/', {
         page,
@@ -77,6 +82,7 @@ export function useCases(params: CasesQueryParams = {}) {
         search: search || undefined,
         stage: stage !== 'all' ? stage : undefined,
         bank: bank || undefined,
+        sla_status: sla_status || undefined,
       })
     },
   })
@@ -365,19 +371,4 @@ export function useUpdateClientToCaseSLAConfig() {
       await queryClient.refetchQueries({ queryKey: ['client-to-case-sla'] })
     },
   })
-}
-
-/**
- * Calculate LTV percentage.
- */
-export function calculateLTV(loanAmount: string | null, propertyValue: string | null): string {
-  const loan = parseFloat(loanAmount || '0')
-  const property = parseFloat(propertyValue || '0')
-
-  if (property <= 0 || loan <= 0) {
-    return '0.00'
-  }
-
-  const ltv = (loan / property) * 100
-  return ltv.toFixed(2)
 }
