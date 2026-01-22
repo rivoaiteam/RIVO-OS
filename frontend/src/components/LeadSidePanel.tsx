@@ -193,8 +193,8 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
               className={cn(
                 'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
                 activeTab === 'whatsapp'
-                  ? 'text-[#25D366] border-[#25D366]'
-                  : 'text-gray-500 border-transparent hover:text-[#25D366]'
+                  ? 'text-[#00A884] border-[#00A884]'
+                  : 'text-gray-500 border-transparent hover:text-[#00A884]'
               )}
             >
               WhatsApp
@@ -279,7 +279,7 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
 
       {/* WhatsApp Tab */}
       {activeTab === 'whatsapp' && lead && (
-        <div className="flex-1 overflow-hidden p-6">
+        <div className="flex-1 overflow-hidden p-4">
           <LeadWhatsAppTab leadId={leadId!} leadInfo={{ name: lead.name, phone: lead.phone, email: lead.email || undefined }} onError={setWhatsAppError} />
         </div>
       )}

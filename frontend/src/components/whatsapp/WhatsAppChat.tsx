@@ -98,7 +98,7 @@ export function WhatsAppChat({ messages, isLoading, isSending, onSend, clientInf
   return (
     <div className="flex flex-col h-full">
       {/* Messages - takes all available space */}
-      <div className="flex-1 overflow-y-auto space-y-3 p-3 bg-[#ECE5DD] rounded-lg">
+      <div className="flex-1 overflow-y-auto space-y-3 p-3 bg-[#EFEAE2] rounded-lg">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-gray-400">
             <p className="text-sm">No messages yet</p>
@@ -115,14 +115,14 @@ export function WhatsAppChat({ messages, isLoading, isSending, onSend, clientInf
                   className={cn(
                     'max-w-[80%] rounded-lg px-3 py-2',
                     msg.direction === 'outbound'
-                      ? 'bg-[#DCF8C6] text-gray-900 rounded-br-sm'
-                      : 'bg-white text-gray-900 rounded-bl-sm shadow-sm'
+                      ? 'bg-[#D9FDD3] text-[#111B21] rounded-br-sm'
+                      : 'bg-white text-[#111B21] rounded-bl-sm shadow-sm'
                   )}
                 >
                   <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                   <div className={cn(
                     'flex items-center gap-2 mt-1 text-[10px]',
-                    msg.direction === 'outbound' ? 'text-gray-500 justify-end' : 'text-gray-400'
+                    msg.direction === 'outbound' ? 'text-[#667781] justify-end' : 'text-[#667781]'
                   )}>
                     <span>{formatTime(msg.created_at)}</span>
                     {msg.direction === 'outbound' && (
@@ -154,12 +154,12 @@ export function WhatsAppChat({ messages, isLoading, isSending, onSend, clientInf
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#25D366] resize-none"
+            className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#00A884] resize-none"
           />
           <button
             onClick={handleSend}
             disabled={!newMessage.trim() || isSending}
-            className="px-5 py-2.5 bg-[#25D366] text-white text-sm font-medium rounded-lg hover:bg-[#1da851] disabled:opacity-50 transition-colors flex-shrink-0"
+            className="px-5 py-2.5 bg-[#00A884] text-white text-sm font-medium rounded-lg hover:bg-[#008069] disabled:opacity-50 transition-colors flex-shrink-0"
           >
             {isSending ? '...' : 'Send'}
           </button>
@@ -220,7 +220,7 @@ export function WhatsAppChat({ messages, isLoading, isSending, onSend, clientInf
                     </div>
                     <button
                       onClick={handleUseTemplate}
-                      className="mt-3 w-full py-2 bg-[#25D366] text-white text-sm font-medium rounded-lg hover:bg-[#1da851] transition-colors"
+                      className="mt-3 w-full py-2 bg-[#00A884] text-white text-sm font-medium rounded-lg hover:bg-[#008069] transition-colors"
                     >
                       Use Template
                     </button>
