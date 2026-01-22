@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from users.permissions import IsAuthenticated
 
 from clients.models import Client
-from .models import WhatsAppMessage, MessageDirection, MessageStatus
+from .models import WhatsAppMessage, MessageDirection, MessageStatus, MessageType
 from .serializers import WhatsAppMessageSerializer, SendMessageSerializer
 from .services import ycloud_service, YCloudError, verify_webhook_signature
 
@@ -62,7 +62,6 @@ def get_client_messages(request, client_id):
                         msg.status = new_status
                         # Update delivered_at timestamp if available
                         if ycloud_data.get('deliverTime'):
-                            from django.utils.dateparse import parse_datetime
                             msg.delivered_at = parse_datetime(ycloud_data['deliverTime'])
                         msg.save()
                         logger.info(f'Updated message {msg.id} status to {new_status}')
@@ -203,7 +202,6 @@ def send_template_message(request):
         )
 
     # Create the message record
-    from .models import MessageType
     whatsapp_message = WhatsAppMessage.objects.create(
         client=client,
         direction=MessageDirection.OUTBOUND,

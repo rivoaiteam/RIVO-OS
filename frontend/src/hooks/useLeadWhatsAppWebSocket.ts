@@ -67,9 +67,9 @@ export function useLeadWhatsAppWebSocket(leadId: string | null) {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
-        console.log('Lead WebSocket message received:', data.event)
+        console.log('Lead WebSocket message received:', data.type)
 
-        if (data.event === 'new_message') {
+        if (data.type === 'new_message') {
           // Update React Query cache with new message
           queryClient.setQueryData<LeadMessagesResponse>(
             ['lead-whatsapp-messages', leadId],
@@ -77,7 +77,7 @@ export function useLeadWhatsAppWebSocket(leadId: string | null) {
               if (!old) return old
 
               // Check for duplicate
-              const exists = old.messages.some((m) => m.id === data.data.id)
+              const exists = old.messages.some((m) => m.id === data.message.id)
               if (exists) {
                 console.log('Duplicate lead message ignored')
                 return old
@@ -86,12 +86,12 @@ export function useLeadWhatsAppWebSocket(leadId: string | null) {
               console.log('Adding new lead message to cache')
               return {
                 ...old,
-                messages: [...old.messages, data.data as LeadWhatsAppMessage],
+                messages: [...old.messages, data.message as LeadWhatsAppMessage],
                 count: old.count + 1,
               }
             }
           )
-        } else if (data.event === 'status_update') {
+        } else if (data.type === 'status_update') {
           // Update message status in cache
           queryClient.setQueryData<LeadMessagesResponse>(
             ['lead-whatsapp-messages', leadId],
@@ -101,7 +101,7 @@ export function useLeadWhatsAppWebSocket(leadId: string | null) {
               return {
                 ...old,
                 messages: old.messages.map((m) =>
-                  m.id === data.data.message_id ? { ...m, status: data.data.status } : m
+                  m.id === data.message_id ? { ...m, status: data.status } : m
                 ),
               }
             }

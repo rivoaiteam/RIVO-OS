@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react'
-import { X, AlertCircle, Loader2, Briefcase, MessageCircle } from 'lucide-react'
+import { X, AlertCircle, Loader2, Briefcase } from 'lucide-react'
 import {
   useClient,
   useCreateClient,
@@ -189,6 +189,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
   const [tenureMonths, setTenureMonths] = useState('0')
 
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [whatsAppError, setWhatsAppError] = useState<string | null>(null)
   const [showCaseCreation, setShowCaseCreation] = useState(false)
   const [_hasChanges, _setHasChanges] = useState(false)
   const [initialLoadDone, setInitialLoadDone] = useState(false)
@@ -606,9 +607,22 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
         )}
 
         {saveError && (
-          <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded text-red-600 text-xs flex items-center gap-2">
-            <AlertCircle className="h-3.5 w-3.5" />
+          <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs flex items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
             {saveError}
+            <button onClick={() => setSaveError(null)} className="ml-auto text-red-400 hover:text-red-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {whatsAppError && (
+          <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs flex items-center gap-2">
+            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+            {whatsAppError}
+            <button onClick={() => setWhatsAppError(null)} className="ml-auto text-red-400 hover:text-red-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
 
@@ -649,6 +663,17 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
               Documents
             </button>
             <button
+              onClick={() => setActiveTab('whatsapp')}
+              className={cn(
+                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+                activeTab === 'whatsapp'
+                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
+                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              WhatsApp
+            </button>
+            <button
               onClick={() => setActiveTab('activity')}
               className={cn(
                 'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
@@ -658,18 +683,6 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
               )}
             >
               Activity
-            </button>
-            <button
-              onClick={() => setActiveTab('whatsapp')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5',
-                activeTab === 'whatsapp'
-                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
-                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
-              )}
-            >
-              <MessageCircle className="w-4 h-4" />
-              WhatsApp
             </button>
           </div>
         )}
@@ -759,7 +772,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
               </div>
 
               {applicationType === 'joint' && (
-                <div className="pt-4 border-t border-gray-100 space-y-4">
+                <div className="pt-4 space-y-4">
                   <h4 className="text-xs font-medium text-gray-500">Co-borrower Details</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField label="First Name *">
@@ -1015,7 +1028,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       {/* WhatsApp Tab Content */}
       {!isCreateMode && activeTab === 'whatsapp' && (
         <div className="flex-1 overflow-y-auto p-6">
-          <ClientWhatsAppTab clientId={clientId} clientPhone={client?.phone} client={client} />
+          <ClientWhatsAppTab clientId={clientId} clientPhone={client?.phone} client={client} onError={setWhatsAppError} />
         </div>
       )}
 

@@ -135,10 +135,8 @@ class YCloudService:
         Raises:
             YCloudError: If the API request fails
         """
-        if not self.api_key:
-            raise YCloudError('YCLOUD_API_KEY not configured')
-        if not self.from_number:
-            raise YCloudError('YCLOUD_WHATSAPP_FROM_NUMBER not configured')
+        if not self.api_key or not self.from_number:
+            raise YCloudError('WhatsApp integration is not configured. Please contact support.')
 
         # Use sendDirectly endpoint for instant/utility messages (no 24hr window restriction)
         url = f'{YCLOUD_API_BASE_URL}/whatsapp/messages/sendDirectly'
@@ -202,10 +200,8 @@ class YCloudService:
         Raises:
             YCloudError: If the API request fails
         """
-        if not self.api_key:
-            raise YCloudError('YCLOUD_API_KEY not configured')
-        if not self.from_number:
-            raise YCloudError('YCLOUD_WHATSAPP_FROM_NUMBER not configured')
+        if not self.api_key or not self.from_number:
+            raise YCloudError('WhatsApp integration is not configured. Please contact support.')
 
         # Use sendDirectly for templates too for synchronous delivery
         url = f'{YCLOUD_API_BASE_URL}/whatsapp/messages/sendDirectly'
@@ -268,7 +264,7 @@ class YCloudService:
             YCloudError: If the API request fails
         """
         if not self.api_key:
-            raise YCloudError('YCLOUD_API_KEY not configured')
+            raise YCloudError('WhatsApp integration is not configured. Please contact support.')
 
         url = f'{YCLOUD_API_BASE_URL}/whatsapp/messages/{message_id}'
 
@@ -311,7 +307,7 @@ class YCloudService:
             YCloudError: If the API request fails
         """
         if not self.api_key:
-            raise YCloudError('YCLOUD_API_KEY not configured')
+            raise YCloudError('WhatsApp integration is not configured. Please contact support.')
 
         url = f'{YCLOUD_API_BASE_URL}/whatsapp/templates'
         params = {

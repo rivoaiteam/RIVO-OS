@@ -6,7 +6,6 @@
 import { useState, useCallback } from 'react'
 import { useLeads } from '@/hooks/useLeads'
 import { useSourcesForFilter } from '@/hooks/useChannels'
-import { useCampaignDashboardWebSocket } from '@/hooks/useLeadCampaign'
 import { useUrlFilters } from '@/hooks/useUrlState'
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch'
 import { LeadSidePanel } from '@/components/LeadSidePanel'
@@ -22,8 +21,7 @@ import {
   SearchInput,
 } from '@/components/ui/TablePageLayout'
 import { formatDate, formatTimeAgo } from '@/lib/formatters'
-import type { LeadListItem, LeadStatus, CampaignStatus } from '@/types/mortgage'
-import { CAMPAIGN_STATUS_LABELS } from '@/types/mortgage'
+import type { LeadListItem, LeadStatus } from '@/types/mortgage'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 10
@@ -34,43 +32,16 @@ const STATUS_TABS = [
   { value: 'declined' as const, label: 'Declined' },
 ]
 
-// Campaign status filter tabs
-const CAMPAIGN_TABS: { value: CampaignStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All Campaign' },
-  { value: 'subscriber_pending', label: 'Pending' },
-  { value: 'qualified', label: 'Qualified' },
-  { value: 'disqualified', label: 'Disqualified' },
-  { value: 'converted', label: 'Converted' },
-]
-
 const DEFAULT_FILTERS = {
   status: 'all',
-  campaign_status: 'all',
   search: '',
   page: '1',
   source: '',
 }
 
-// Campaign status badge colors
-const CAMPAIGN_STATUS_COLORS: Record<CampaignStatus, string> = {
-  subscriber_pending: 'bg-gray-100 text-gray-700',
-  segment_mortgaged: 'bg-blue-100 text-blue-700',
-  segment_renting: 'bg-purple-100 text-purple-700',
-  segment_other: 'bg-gray-100 text-gray-600',
-  locale_dubai: 'bg-amber-100 text-amber-700',
-  locale_abudhabi: 'bg-orange-100 text-orange-700',
-  locale_other: 'bg-gray-100 text-gray-600',
-  qualified: 'bg-green-100 text-green-700',
-  disqualified: 'bg-red-100 text-red-700',
-  converted: 'bg-emerald-100 text-emerald-700',
-}
-
 export function LeadsPage() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [filters, setFilters] = useUrlFilters(DEFAULT_FILTERS)
-
-  // WebSocket for real-time campaign updates
-  useCampaignDashboardWebSocket()
 
   const handleSearchChange = useCallback((value: string) => {
     setFilters({ search: value, page: '1' })
@@ -83,7 +54,6 @@ export function LeadsPage() {
 
   const currentPage = parseInt(filters.page, 10) || 1
   const statusFilter = filters.status as LeadStatus | 'all'
-  const campaignStatusFilter = filters.campaign_status as CampaignStatus | 'all'
   const sourceFilter = filters.source || ''
 
   const { data: sources } = useSourcesForFilter('untrusted')
@@ -94,7 +64,6 @@ export function LeadsPage() {
     search: filters.search,
     status: statusFilter,
     sub_source_id: sourceFilter || undefined,
-    campaign_status: campaignStatusFilter,
   })
 
   const leads = data?.items || []
@@ -110,7 +79,7 @@ export function LeadsPage() {
   const getSlaDisplay = (slaDisplay: string | null) => {
     if (!slaDisplay) return null
     const lower = slaDisplay.toLowerCase()
-    if (lower === 'completed') return null // Don't show completed SLA
+    if (lower === 'completed') return null
     if (lower.includes('overdue')) return { text: slaDisplay, status: 'overdue' as const }
     return { text: slaDisplay, status: 'remaining' as const }
   }
@@ -146,23 +115,6 @@ export function LeadsPage() {
               </option>
             ))}
           </select>
-          {/* Campaign Status Filter */}
-          <div className="flex items-center gap-1 border-b border-gray-200 ml-4">
-            {CAMPAIGN_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setFilters({ campaign_status: tab.value, page: '1' })}
-                className={cn(
-                  'px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors',
-                  campaignStatusFilter === tab.value
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -171,18 +123,15 @@ export function LeadsPage() {
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="w-[22%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                <th className="w-[22%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Source</th>
-                <th className="w-[18%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Campaign Status</th>
-                <th className="w-[19%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
-                <th className="w-[19%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Last Activity</th>
+                <th className="w-[28%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                <th className="w-[30%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Source</th>
+                <th className="w-[21%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
+                <th className="w-[21%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Last Activity</th>
               </tr>
             </thead>
             <tbody>
               {leads.map((lead) => {
                 const sla = getSlaDisplay(lead.sla_display)
-                const campaignStatusColor = CAMPAIGN_STATUS_COLORS[lead.campaign_status] || 'bg-gray-100 text-gray-600'
-                const campaignStatusLabel = CAMPAIGN_STATUS_LABELS[lead.campaign_status] || lead.campaign_status
                 return (
                   <tr
                     key={lead.id}
@@ -205,14 +154,6 @@ export function LeadsPage() {
                     <td className="py-3">
                       <span className="text-xs text-gray-600 truncate block" title={getSourceDisplay(lead)}>
                         {getSourceDisplay(lead)}
-                      </span>
-                    </td>
-                    <td className="py-3">
-                      <span className={cn(
-                        'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium',
-                        campaignStatusColor
-                      )}>
-                        {campaignStatusLabel}
                       </span>
                     </td>
                     <td className="py-3">

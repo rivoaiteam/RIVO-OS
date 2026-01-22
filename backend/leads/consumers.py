@@ -202,7 +202,10 @@ class LeadWhatsAppConsumer(AsyncJsonWebsocketConsumer):
 
         Called when a message is sent or received for this lead.
         """
-        await self.send_json(event['message'])
+        await self.send_json({
+            'type': 'new_message',
+            'message': event['message']
+        })
 
     async def lead_message_status(self, event):
         """
@@ -211,8 +214,9 @@ class LeadWhatsAppConsumer(AsyncJsonWebsocketConsumer):
         Called when a message status changes (sent, delivered, read, failed).
         """
         await self.send_json({
-            'event': 'status_update',
-            'data': event.get('data')
+            'type': 'status_update',
+            'message_id': event.get('message_id'),
+            'status': event.get('status')
         })
 
     @database_sync_to_async

@@ -260,7 +260,9 @@ export function useLeadWebSocket(leadId: string | null) {
 
 /**
  * Hook for subscribing to all campaign lead updates (dashboard view).
+ * NOTE: Backend doesn't have /ws/leads/dashboard/ route yet, so disabled for now.
  */
 export function useCampaignDashboardWebSocket() {
-  return useLeadWebSocket('dashboard')
+  // Disabled until backend implements dashboard WebSocket
+  return { isConnected: false }
 }

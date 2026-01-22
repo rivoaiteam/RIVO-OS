@@ -206,7 +206,7 @@ export function ClientsPage() {
                 <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">DBR</th>
                 <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
                 <th className="w-[14%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Last Activity</th>
-                <th className="w-[16%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                <th className="w-[16%] text-right pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -247,15 +247,15 @@ export function ClientsPage() {
                     <td className="py-3">
                       <span className="text-xs text-gray-500">{formatTimeAgo(client.updated_at)}</span>
                     </td>
-                    <td className="py-3">
-                      <div className="flex items-center gap-1">
+                    <td className="py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
                         {client.active_case_id && client.active_case_id.length > 0 && (
                           <CaseDropdown cases={client.active_case_id} onSelect={setSelectedCaseId} banks={banks} />
                         )}
                         {!isReadOnly && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(client) }}
-                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition-colors"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

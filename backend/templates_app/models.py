@@ -15,7 +15,7 @@ class TemplateCategory(models.TextChoices):
     GREETING = 'greeting', 'Greeting'
     FOLLOWUP = 'followup', 'Follow-up'
     DOCUMENTATION = 'documentation', 'Documentation'
-    LOAN_UPDATE = 'loan_update', 'Loan Update'
+    APPLICATION_UPDATE = 'application_update', 'Application Update'
     GENERAL = 'general', 'General'
 
 
@@ -63,15 +63,14 @@ class MessageTemplate(models.Model):
     def get_available_variables(cls):
         """Return list of available template variables with descriptions."""
         return [
-            {'name': 'first_name', 'description': "Client's first name"},
-            {'name': 'last_name', 'description': "Client's last name"},
-            {'name': 'full_name', 'description': "Client's full name"},
-            {'name': 'phone', 'description': "Client's phone number"},
-            {'name': 'email', 'description': "Client's email address"},
-            {'name': 'nationality', 'description': "Client's nationality"},
-            {'name': 'company_name', 'description': "Client's employer"},
-            {'name': 'monthly_salary', 'description': "Monthly salary (formatted)"},
-            {'name': 'max_loan', 'description': "Maximum loan amount (formatted)"},
-            {'name': 'dbr_available', 'description': "DBR available (formatted)"},
-            {'name': 'today_date', 'description': "Today's date"},
+            {'name': 'first_name', 'description': 'First name'},
+            {'name': 'name', 'description': 'Full name'},
+            {'name': 'phone', 'description': 'Phone number'},
+            {'name': 'email', 'description': 'Email address'},
+            {'name': 'salary', 'description': 'Monthly salary'},
+            {'name': 'max_loan', 'description': 'Max loan amount'},
+            {'name': 'dbr', 'description': 'DBR available'},
+            {'name': 'nationality', 'description': 'Nationality'},
+            {'name': 'company', 'description': 'Company name'},
+            {'name': 'today', 'description': "Today's date"},
         ]
