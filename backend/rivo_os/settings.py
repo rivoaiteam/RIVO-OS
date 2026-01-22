@@ -160,40 +160,18 @@ REST_FRAMEWORK = {
 
 
 # CORS configuration
-_cors_origins = os.environ.get(
+CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
     'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
-)
-
-# Allow all origins if set to '*' or 'all'
-if _cors_origins.strip() in ('*', 'all'):
-    CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOWED_ORIGINS = []
-else:
-    CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins.split(',') if origin.strip()]
+).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = ['DELETE', 'GET', 'OPTIONS', 'PATCH', 'POST', 'PUT']
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
 
 # Session/Cookie settings for cross-origin
-# For production (HTTPS), use SameSite=None and Secure=True
-_is_production = os.environ.get('RENDER', '') == 'true' or not DEBUG
-SESSION_COOKIE_SAMESITE = 'None' if _is_production else 'Lax'
-SESSION_COOKIE_SECURE = _is_production
-CSRF_COOKIE_SAMESITE = 'None' if _is_production else 'Lax'
-CSRF_COOKIE_SECURE = _is_production
+SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
+CSRF_COOKIE_SECURE = not DEBUG
 
 
 # Supabase configuration
