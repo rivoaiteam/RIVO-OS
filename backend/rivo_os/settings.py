@@ -162,10 +162,23 @@ REST_FRAMEWORK = {
 # CORS configuration
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,https://rivo-81b1.onrender.com'
 ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Allow all headers and methods for CORS
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Session/Cookie settings for cross-origin
 SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
