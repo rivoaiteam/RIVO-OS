@@ -11,11 +11,17 @@ from clients.models import (
     Client,
     ClientStatus,
     CoApplicant,
+    ClientExtraDetails,
     ApplicationType,
     ResidencyType,
     VisaType,
     EmploymentType,
     Timeline,
+    PropertyCategory,
+    PropertyType,
+    Emirate,
+    TransactionType,
+    MaritalStatus,
 )
 from channels.models import SubSource
 
@@ -112,20 +118,37 @@ class ClientListSerializer(serializers.ModelSerializer):
     )
     sla_display = serializers.SerializerMethodField()
     active_case_id = serializers.SerializerMethodField()
+    first_contact_sla_status = serializers.SerializerMethodField()
+    client_to_case_sla_status = serializers.SerializerMethodField()
+    ltv_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Client
         fields = [
             'id', 'name', 'phone', 'email', 'status',
             'application_type', 'dbr_available',
+            'property_value', 'loan_amount', 'ltv_status',
             'sub_source', 'sla_display', 'active_case_id',
+            'first_contact_sla_status', 'client_to_case_sla_status',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'dbr_available']
 
+    def get_ltv_status(self, obj: Client) -> dict:
+        """Get LTV status for display."""
+        return obj.ltv_status
+
     def get_sla_display(self, obj: Client) -> str:
         """Get human-readable SLA timer display."""
         return obj.sla_timer.get('display', 'No SLA')
+
+    def get_first_contact_sla_status(self, obj: Client) -> dict | None:
+        """Get First Contact SLA status for list view."""
+        return obj.first_contact_sla_status
+
+    def get_client_to_case_sla_status(self, obj: Client) -> dict | None:
+        """Get Client-to-Case SLA status for list view."""
+        return obj.client_to_case_sla_status
 
     def get_active_case_id(self, obj: Client) -> list[dict] | None:
         """Get list of active cases for this client."""
@@ -154,11 +177,12 @@ class ClientDetailSerializer(serializers.ModelSerializer):
     """
     Serializer for client detail view.
 
-    Returns all fields plus computed DBR, max_loan, can_create_case,
+    Returns all fields plus computed DBR, max_loan, LTV, can_create_case,
     and SLA status fields for countdown display.
     """
     sub_source = SubSourceNestedSerializer(read_only=True)
     co_applicant = CoApplicantSerializer(read_only=True)
+    extra_details = serializers.SerializerMethodField()
 
     # Computed fields
     total_cc_liability = serializers.DecimalField(
@@ -176,12 +200,16 @@ class ClientDetailSerializer(serializers.ModelSerializer):
     max_loan_amount = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
+    ltv_status = serializers.SerializerMethodField()
     can_create_case = serializers.SerializerMethodField()
 
     # SLA status fields
     first_contact_sla_status = serializers.SerializerMethodField()
     client_to_case_sla_status = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
+
+    # Cases linked to this client
+    cases = serializers.SerializerMethodField()
 
     class Meta:
         model = Client
@@ -197,18 +225,27 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             'cc_1_limit', 'cc_2_limit', 'cc_3_limit', 'cc_4_limit', 'cc_5_limit',
             # Liabilities - Loans
             'auto_loan_emi', 'personal_loan_emi', 'existing_mortgage_emi',
+            # Property Details
+            'property_category', 'property_type', 'emirate', 'transaction_type',
+            'property_value', 'is_first_property', 'developer',
+            # Loan Details
+            'loan_amount', 'tenure_years', 'tenure_months',
             # Intent
             'notes', 'timeline',
             # Status & Source
             'status', 'sub_source', 'converted_from_lead',
             # Co-applicant
             'co_applicant',
+            # Extra Details
+            'extra_details',
             # Computed
             'total_cc_liability', 'total_loan_emis', 'total_monthly_liabilities',
-            'dbr_available', 'max_loan_amount', 'can_create_case',
+            'dbr_available', 'max_loan_amount', 'ltv_status', 'can_create_case',
             # SLA Status
             'first_contact_sla_status', 'client_to_case_sla_status',
             'first_contact_completed_at', 'assigned_to',
+            # Cases
+            'cases',
             # Timestamps
             'created_at', 'updated_at',
         ]
@@ -217,6 +254,10 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             'total_cc_liability', 'total_loan_emis', 'total_monthly_liabilities',
             'dbr_available', 'max_loan_amount', 'first_contact_completed_at',
         ]
+
+    def get_ltv_status(self, obj: Client) -> dict:
+        """Get LTV status with value, limit, and within_limit."""
+        return obj.ltv_status
 
     def get_can_create_case(self, obj):
         """Return can_create_case validation result."""
@@ -249,6 +290,34 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             'email': obj.assigned_to.email,
         }
 
+    def get_extra_details(self, obj: Client) -> dict | None:
+        """Get extra details if they exist."""
+        try:
+            extra = obj.extra_details
+            return ClientExtraDetailsSerializer(extra).data
+        except ClientExtraDetails.DoesNotExist:
+            return None
+
+    def get_cases(self, obj: Client) -> list[dict] | None:
+        """Get list of cases linked to this client."""
+        from cases.models import Case, CaseStage
+        cases = Case.objects.filter(client=obj).exclude(
+            stage__in=[CaseStage.REJECTED, CaseStage.NOT_PROCEEDING]
+        ).order_by('-created_at')
+
+        if not cases:
+            return None
+
+        return [
+            {
+                'id': str(case.id),
+                'stage': case.stage,
+                'bank': case.bank or 'No bank',
+                'loan_amount': str(case.loan_amount),
+            }
+            for case in cases
+        ]
+
 
 class ClientCreateSerializer(serializers.ModelSerializer):
     """
@@ -276,6 +345,11 @@ class ClientCreateSerializer(serializers.ModelSerializer):
             'cc_1_limit', 'cc_2_limit', 'cc_3_limit', 'cc_4_limit', 'cc_5_limit',
             # Liabilities - Loans
             'auto_loan_emi', 'personal_loan_emi', 'existing_mortgage_emi',
+            # Property Details
+            'property_category', 'property_type', 'emirate', 'transaction_type',
+            'property_value', 'is_first_property', 'developer',
+            # Loan Details
+            'loan_amount', 'tenure_years', 'tenure_months',
             # Intent
             'notes', 'timeline',
             # Source
@@ -355,6 +429,11 @@ class ClientUpdateSerializer(serializers.ModelSerializer):
             'cc_1_limit', 'cc_2_limit', 'cc_3_limit', 'cc_4_limit', 'cc_5_limit',
             # Liabilities - Loans
             'auto_loan_emi', 'personal_loan_emi', 'existing_mortgage_emi',
+            # Property Details
+            'property_category', 'property_type', 'emirate', 'transaction_type',
+            'property_value', 'is_first_property', 'developer',
+            # Loan Details
+            'loan_amount', 'tenure_years', 'tenure_months',
             # Intent
             'notes', 'timeline',
         ]
@@ -373,11 +452,9 @@ class ClientChangeStatusSerializer(serializers.Serializer):
             # Define allowed transitions
             allowed_transitions = {
                 ClientStatus.ACTIVE: [
-                    ClientStatus.CONVERTED,
                     ClientStatus.DECLINED,
                     ClientStatus.NOT_PROCEEDING,
                 ],
-                ClientStatus.CONVERTED: [],  # Terminal
                 ClientStatus.DECLINED: [ClientStatus.ACTIVE],  # Can reactivate
                 ClientStatus.NOT_PROCEEDING: [ClientStatus.ACTIVE],  # Can reactivate
             }
@@ -409,3 +486,55 @@ class ClientReassignSerializer(serializers.Serializer):
             raise serializers.ValidationError('User is not active.')
 
         return value
+
+
+class ClientExtraDetailsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for client extra details.
+
+    Returns all extra details fields for bank form information.
+    """
+
+    class Meta:
+        model = ClientExtraDetails
+        fields = [
+            'id',
+            # Personal Information
+            'marital_status', 'spouse_name', 'spouse_contact',
+            'dependents', 'children_count', 'children_in_school',
+            'qualification', 'mailing_address', 'mother_maiden_name',
+            # Work Details
+            'job_title', 'company_industry',
+            'years_in_occupation', 'years_in_current_company', 'years_in_business',
+            'company_employee_count', 'office_address', 'office_po_box', 'office_landline',
+            'work_email', 'company_hr_email',
+            # References
+            'ref_1_name', 'ref_1_relationship', 'ref_1_mobile',
+            'ref_2_name', 'ref_2_relationship', 'ref_2_mobile',
+            # Timestamps
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ClientExtraDetailsCreateUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating/updating client extra details.
+    """
+
+    class Meta:
+        model = ClientExtraDetails
+        fields = [
+            # Personal Information
+            'marital_status', 'spouse_name', 'spouse_contact',
+            'dependents', 'children_count', 'children_in_school',
+            'qualification', 'mailing_address', 'mother_maiden_name',
+            # Work Details
+            'job_title', 'company_industry',
+            'years_in_occupation', 'years_in_current_company', 'years_in_business',
+            'company_employee_count', 'office_address', 'office_po_box', 'office_landline',
+            'work_email', 'company_hr_email',
+            # References
+            'ref_1_name', 'ref_1_relationship', 'ref_1_mobile',
+            'ref_2_name', 'ref_2_relationship', 'ref_2_mobile',
+        ]

@@ -126,6 +126,25 @@ class CaseViewSet(viewsets.ModelViewSet):
         if client_id:
             queryset = queryset.filter(client_id=client_id)
 
+        # SLA status filter - filter based on stage_sla_status values
+        sla_status_filter = self.request.query_params.get('sla_status', '').strip()
+        if sla_status_filter:
+            matching_ids = []
+            for case in queryset:
+                sla = case.stage_sla_status
+                status = sla.get('status', '')
+                display = sla.get('display', '')
+                is_overdue = status == 'overdue' or 'overdue' in display.lower()
+                is_completed = status == 'completed' or display == 'Completed'
+
+                if sla_status_filter == 'completed' and is_completed:
+                    matching_ids.append(case.id)
+                elif sla_status_filter == 'overdue' and is_overdue:
+                    matching_ids.append(case.id)
+                elif sla_status_filter == 'remaining' and not is_overdue and not is_completed and display:
+                    matching_ids.append(case.id)
+            queryset = queryset.filter(id__in=matching_ids)
+
         return queryset
 
     def list(self, request: Request) -> Response:

@@ -210,3 +210,105 @@ Plus HTML attribute: `min="0"`
 - Storage key: `rivo-system-password`
 - Stored in localStorage
 - All mock users use this password
+
+## Shared Utilities and Components
+
+### Formatting Utilities (`/lib/formatters.ts`)
+Centralized formatting functions used across all pages:
+
+```typescript
+formatTimeAgo(dateString)    // "2d ago", "5h ago", "Just now"
+formatDate(dateString)       // "15 Jan 2024" (en-GB)
+formatDateAE(dateString)     // "Jan 15, 2024" (en-AE)
+formatCurrencyAED(value)     // "AED 150,000"
+formatDbr(dbrString)         // "AED 5,000" or "-"
+getDbrColorClass(dbrString)  // "text-green-600" / "text-amber-600" / "text-red-600"
+```
+
+### Debounced Search Hook (`/hooks/useDebouncedSearch.ts`)
+Reusable hook for search inputs with debouncing:
+
+```typescript
+const { inputValue, setInputValue, debouncedValue, clear } = useDebouncedSearch({
+  initialValue: '',
+  delay: 300,
+  onSearch: (value) => setFilters({ search: value, page: '1' })
+})
+```
+
+### Table Page Components (`/components/ui/TablePageLayout.tsx`)
+
+#### PageHeader
+Consistent page header with title, subtitle, and optional action button:
+```tsx
+<PageHeader
+  title="Clients"
+  subtitle="Manage mortgage applicants"
+  actionLabel="New Client"
+  onAction={() => setSelectedId('new')}
+  hideAction={isReadOnly}
+/>
+```
+
+#### StatusTabs
+Generic status filter tabs with TypeScript generics:
+```tsx
+<StatusTabs
+  tabs={[
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'declined', label: 'Declined' },
+  ]}
+  value={statusFilter}
+  onChange={(value) => setStatusFilter(value)}
+/>
+```
+
+#### SearchInput
+Consistent search input with icon:
+```tsx
+<SearchInput
+  value={inputValue}
+  onChange={setInputValue}
+  placeholder="Search..."
+/>
+```
+
+### SLA Filter Dropdown
+Standard SLA filter used on Leads, Clients, and Cases pages (always first dropdown after search):
+
+```typescript
+const SLA_OPTIONS = [
+  { value: '', label: 'All SLA' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'overdue', label: 'Overdue' },
+  { value: 'remaining', label: 'Remaining' },
+]
+```
+
+### Filter Order Convention
+Standard filter order on table pages:
+1. Search input
+2. SLA dropdown (first)
+3. Status tabs or other filters
+4. Source/Bank dropdowns (last)
+
+### Side Panel Close/Stay Open Behavior
+Standard behavior for when side panels close vs stay open:
+
+**Close panel after:**
+| Action | Reason |
+|--------|--------|
+| Create new entity | Task complete, show in list |
+| Status/Stage change | Context changed |
+| Convert Lead to Client | New entity created |
+| Delete | Entity removed |
+
+**Stay open after:**
+| Action | Reason |
+|--------|--------|
+| Save/Update existing | User may continue editing |
+| Upload document | User may upload more |
+| Add note | User may add more |
+
+**Principle:** Create = task complete (close), Edit = ongoing work (stay open)

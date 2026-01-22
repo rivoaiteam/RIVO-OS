@@ -7,6 +7,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, AlertCircle, Loader2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { caseToast, clientToast } from '@/lib/toastMessages'
+import { FormField } from '@/components/ui/FormField'
+import { SidePanelWrapper } from '@/components/ui/SidePanelWrapper'
 import {
   useCase,
   useCreateCase,
@@ -16,7 +19,6 @@ import {
   CASE_STAGES,
   getStageLabel,
   isTerminalStage,
-  calculateLTV,
 } from '@/hooks/useCases'
 import { useClients, useClient } from '@/hooks/useClients'
 import { useAuth } from '@/contexts/AuthContext'
@@ -29,14 +31,12 @@ import type {
   CaseStage,
   PropertyCategory,
   CaseTypeValue,
-  Emirate,
   MortgageType,
   FixedPeriod,
   SLAStatusValue,
 } from '@/types/mortgage'
 import {
   APPLICATION_TYPE_LABELS,
-  EMIRATE_LABELS,
   MORTGAGE_TYPE_LABELS,
   FIXED_PERIOD_LABELS,
   CASE_STAGE_LABELS,
@@ -52,18 +52,28 @@ interface CaseSidePanelProps {
 type CaseTabType = 'details' | 'documents' | 'activity'
 
 const stageColors: Record<CaseStage, string> = {
+  // Active stages (main flow)
   processing: 'bg-blue-100 text-blue-700',
-  document_collection: 'bg-blue-100 text-blue-700',
-  bank_submission: 'bg-blue-100 text-blue-800',
-  bank_processing: 'bg-blue-200 text-blue-800',
-  offer_issued: 'bg-indigo-100 text-indigo-700',
-  offer_accepted: 'bg-indigo-200 text-indigo-800',
-  property_valuation: 'bg-violet-100 text-violet-700',
-  final_approval: 'bg-violet-200 text-violet-800',
-  property_transfer: 'bg-purple-100 text-purple-700',
+  submitted_to_bank: 'bg-blue-100 text-blue-700',
+  under_review: 'bg-blue-200 text-blue-800',
+  submitted_to_credit: 'bg-indigo-100 text-indigo-700',
+  valuation_initiated: 'bg-indigo-200 text-indigo-800',
+  valuation_report_received: 'bg-violet-100 text-violet-700',
+  fol_requested: 'bg-violet-200 text-violet-800',
+  fol_received: 'bg-purple-100 text-purple-700',
+  fol_signed: 'bg-purple-200 text-purple-800',
+  disbursed: 'bg-emerald-100 text-emerald-700',
+  final_documents: 'bg-emerald-200 text-emerald-800',
+  mc_received: 'bg-green-100 text-green-700',
+  // Query stages
+  sales_queries: 'bg-orange-100 text-orange-700',
+  credit_queries: 'bg-orange-100 text-orange-700',
+  disbursal_queries: 'bg-orange-100 text-orange-700',
+  // Hold
   on_hold: 'bg-amber-100 text-amber-700',
-  property_transferred: 'bg-green-100 text-green-700',
-  declined: 'bg-red-100 text-red-700',
+  // Terminal
+  property_transferred: 'bg-green-200 text-green-800',
+  rejected: 'bg-red-100 text-red-700',
   not_proceeding: 'bg-gray-200 text-gray-500',
 }
 
@@ -92,26 +102,6 @@ export function CaseSidePanel({ caseId, isOpen, onClose, preselectedClientId }: 
         <EditCaseContent caseData={caseData} onClose={onClose} />
       ) : null}
     </SidePanelWrapper>
-  )
-}
-
-function SidePanelWrapper({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-1/2 min-w-[480px] max-w-[800px] bg-white z-50 shadow-xl flex flex-col animate-slide-in-right">
-        {children}
-      </div>
-    </>
-  )
-}
-
-function FormField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      {children}
-    </div>
   )
 }
 
@@ -211,21 +201,8 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
   const [selectedClientId, setSelectedClientId] = useState<string | null>(preselectedClientId || null)
 
   // Case type fields
-  const [propertyCategory, setPropertyCategory] = useState<PropertyCategory>('residential')
+  const [propertyCategory, _setPropertyCategory] = useState<PropertyCategory>('residential')
   const [caseType, setCaseType] = useState<CaseTypeValue>('fully_packaged')
-
-  // Property fields
-  const [propertyType, setPropertyType] = useState<'ready' | 'off_plan'>('ready')
-  const [emirate, setEmirate] = useState<Emirate>('dubai')
-  const [transactionType, setTransactionType] = useState<'primary_purchase' | 'resale' | 'buyout_equity' | 'buyout' | 'equity'>('primary_purchase')
-  const [propertyValue, setPropertyValue] = useState('')
-  const [loanAmount, setLoanAmount] = useState('')
-  const [developer, setDeveloper] = useState('')
-  const [isFirstProperty, setIsFirstProperty] = useState(true)
-
-  // Loan fields
-  const [tenureYears, setTenureYears] = useState(20)
-  const [tenureMonths, setTenureMonths] = useState(0)
 
   // Bank fields
   const [bank, setBank] = useState('')
@@ -235,30 +212,15 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
   const [fixedPeriod, setFixedPeriod] = useState<FixedPeriod | ''>('')
 
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [formInitialized, setFormInitialized] = useState(false)
   const formRef = useRef<HTMLDivElement>(null)
 
   const { data: clientsData } = useClients({ page_size: 100, status: 'active' })
-  const { data: preselectedClientData } = useClient(preselectedClientId || null)
+  const { data: selectedClientData } = useClient(selectedClientId)
   const { data: banks } = useBanks()
   const createCaseMutation = useCreateCase()
 
-  // Filter to only eligible clients (positive DBR and active status)
-  const eligibleClients = (clientsData?.items || []).filter(c =>
-    c.status === 'active' &&
-    c.dbr_available &&
-    parseFloat(c.dbr_available) > 0
-  )
-
-  // Mark form as initialized when preselected client data arrives (no pre-fill - property fields are in Case only)
-  useEffect(() => {
-    if (preselectedClientData && !formInitialized) {
-      setFormInitialized(true)
-    }
-  }, [preselectedClientData, formInitialized])
-
-  // Calculate LTV
-  const ltv = calculateLTV(loanAmount, propertyValue)
+  // Filter to only active clients (eligibility is validated on client side panel)
+  const activeClients = (clientsData?.items || []).filter(c => c.status === 'active')
 
   // Sanitize amount input
   const sanitizeAmount = (value: string): string => {
@@ -276,50 +238,6 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
     // Client validation
     if (!selectedClientId) {
       errors.push('Client is required')
-    }
-
-    // Property validation
-    if (!propertyValue) {
-      errors.push('Property value is required')
-    } else {
-      const propVal = parseFloat(propertyValue)
-      if (isNaN(propVal) || propVal <= 0) {
-        errors.push('Invalid property value (must be a positive number)')
-      }
-    }
-
-    // Loan validation
-    if (!loanAmount) {
-      errors.push('Loan amount is required')
-    } else {
-      const loanVal = parseFloat(loanAmount)
-      const propVal = parseFloat(propertyValue) || 0
-      if (isNaN(loanVal) || loanVal <= 0) {
-        errors.push('Invalid loan amount (must be a positive number)')
-      } else if (propVal > 0 && loanVal > propVal) {
-        errors.push(`Loan amount cannot exceed property value (AED ${propVal.toLocaleString()})`)
-      }
-    }
-
-    // LTV validation
-    if (loanAmount && propertyValue) {
-      const loanVal = parseFloat(loanAmount)
-      const propVal = parseFloat(propertyValue)
-      if (propVal > 0 && loanVal > 0) {
-        const ltvValue = (loanVal / propVal) * 100
-        const ltvLimit = propertyType === 'off_plan' ? 50 : (isFirstProperty ? 80 : 65)
-        if (ltvValue > ltvLimit) {
-          errors.push(`LTV ${ltvValue.toFixed(1)}% exceeds ${ltvLimit}% limit for ${propertyType === 'off_plan' ? 'under construction' : isFirstProperty ? 'first property' : 'second+ property'}`)
-        }
-      }
-    }
-
-    // Tenure validation
-    if (tenureYears < 1 || tenureYears > 25) {
-      errors.push('Invalid tenure (1-25 years)')
-    }
-    if (tenureMonths < 0 || tenureMonths > 11) {
-      errors.push('Invalid months (0-11)')
     }
 
     // Bank validation
@@ -353,25 +271,27 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
     }
 
     try {
+      // Use client's property/loan data for the case
       await createCaseMutation.mutateAsync({
         client_id: selectedClientId!,
         case_type: caseType,
-        property_category: propertyCategory,
-        property_type: propertyType,
-        emirate: emirate,
-        transaction_type: transactionType,
-        property_value: propertyValue,
-        loan_amount: loanAmount,
-        developer: developer || undefined,
-        is_first_property: isFirstProperty,
-        tenure_years: tenureYears,
-        tenure_months: tenureMonths,
+        property_category: selectedClientData?.property_category || propertyCategory,
+        property_type: selectedClientData?.property_type || 'ready',
+        emirate: selectedClientData?.emirate || 'dubai',
+        transaction_type: selectedClientData?.transaction_type || 'primary_purchase',
+        property_value: selectedClientData?.property_value || '',
+        loan_amount: selectedClientData?.loan_amount || '',
+        developer: selectedClientData?.developer || undefined,
+        is_first_property: selectedClientData?.is_first_property ?? true,
+        tenure_years: selectedClientData?.tenure_years || 20,
+        tenure_months: selectedClientData?.tenure_months || 0,
         bank: bank.trim(),
         mortgage_type: mortgageType,
         rate_type: rateType,
         rate: rate,
         fixed_period: fixedPeriod || undefined,
       })
+      clientToast.caseCreated()
       onClose()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to create case')
@@ -410,47 +330,14 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
               disabled={!!preselectedClientId}
               className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white disabled:opacity-50"
             >
-              <option value="">Select an eligible client</option>
-              {eligibleClients.map(client => (
+              <option value="">Select a client</option>
+              {activeClients.map(client => (
                 <option key={client.id} value={client.id}>
                   {client.name} - {client.phone}
                 </option>
               ))}
             </select>
           </FormField>
-          {eligibleClients.length === 0 && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-xs text-amber-700">No eligible clients found. Clients must have positive DBR.</p>
-            </div>
-          )}
-
-          {/* Property Category Toggle */}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPropertyCategory('residential')}
-              className={cn(
-                'flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center gap-1',
-                propertyCategory === 'residential'
-                  ? 'border-[#1e3a5f] bg-[#1e3a5f]/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              )}
-            >
-              <span className="text-sm font-medium text-gray-900">Residential</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setPropertyCategory('commercial')}
-              className={cn(
-                'flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center gap-1',
-                propertyCategory === 'commercial'
-                  ? 'border-[#1e3a5f] bg-[#1e3a5f]/5'
-                  : 'border-gray-200 hover:border-gray-300'
-              )}
-            >
-              <span className="text-sm font-medium text-gray-900">Commercial</span>
-            </button>
-          </div>
 
           {/* Case Type Toggle */}
           <div className="flex gap-2">
@@ -478,134 +365,6 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
             >
               Assisted
             </button>
-          </div>
-        </div>
-
-        {/* Property Details */}
-        <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Property</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Emirate *">
-              <select
-                value={emirate}
-                onChange={(e) => setEmirate(e.target.value as Emirate)}
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white"
-              >
-                {Object.entries(EMIRATE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label="Transaction Type *">
-              <select
-                value={transactionType}
-                onChange={(e) => setTransactionType(e.target.value as 'primary_purchase' | 'resale' | 'buyout_equity' | 'buyout' | 'equity')}
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white"
-              >
-                <option value="primary_purchase">Primary Purchase</option>
-                <option value="resale">Resale</option>
-                <option value="buyout_equity">Buyout + Equity</option>
-                <option value="buyout">Buyout</option>
-                <option value="equity">Equity</option>
-              </select>
-            </FormField>
-            <FormField label="Property Status *">
-              <select
-                value={propertyType}
-                onChange={(e) => setPropertyType(e.target.value as 'ready' | 'off_plan')}
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white"
-              >
-                <option value="ready">Ready</option>
-                <option value="off_plan">Under Construction</option>
-              </select>
-            </FormField>
-            <FormField label="Property Value (AED) *">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={propertyValue}
-                onChange={(e) => setPropertyValue(sanitizeAmount(e.target.value))}
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-              />
-            </FormField>
-          </div>
-
-          {/* First Property Toggle */}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setIsFirstProperty(true)}
-              className={cn(
-                'flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all',
-                isFirstProperty
-                  ? 'bg-[#1e3a5f] text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              )}
-            >
-              First Property
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsFirstProperty(false)}
-              className={cn(
-                'flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all',
-                !isFirstProperty
-                  ? 'bg-[#1e3a5f] text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              )}
-            >
-              Second+ Property
-            </button>
-          </div>
-
-          {propertyType === 'off_plan' && (
-            <FormField label="Developer">
-              <input
-                type="text"
-                value={developer}
-                onChange={(e) => setDeveloper(e.target.value)}
-                placeholder="e.g., Emaar, DAMAC"
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-              />
-            </FormField>
-          )}
-        </div>
-
-        {/* Loan Details */}
-        <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Loan</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Loan Amount (AED) *">
-              <input
-                type="text"
-                inputMode="numeric"
-                value={loanAmount}
-                onChange={(e) => setLoanAmount(sanitizeAmount(e.target.value))}
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
-              />
-            </FormField>
-            <FormField label="Mortgage Term *">
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={1}
-                  max={25}
-                  value={tenureYears}
-                  onChange={(e) => setTenureYears(parseInt(e.target.value) || 1)}
-                  className="w-16 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] text-center"
-                />
-                <span className="text-xs text-gray-500">yrs</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={11}
-                  value={tenureMonths}
-                  onChange={(e) => setTenureMonths(parseInt(e.target.value) || 0)}
-                  className="w-16 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] text-center"
-                />
-                <span className="text-xs text-gray-500">mo</span>
-              </div>
-            </FormField>
           </div>
         </div>
 
@@ -664,31 +423,6 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
           </div>
         </div>
 
-        {/* LTV Summary */}
-        <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Eligibility</h3>
-          <div className="grid grid-cols-1">
-            {(() => {
-              const ltvNum = parseFloat(ltv)
-              const ltvLimit = propertyType === 'off_plan' ? 50 : (isFirstProperty ? 80 : 65)
-              const isWithinLimit = ltvNum > 0 && ltvNum <= ltvLimit
-              return (
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">LTV (Loan to Value)</span>
-                  <span className={cn(
-                    'text-lg font-bold',
-                    ltvNum > 0 ? (isWithinLimit ? 'text-green-600' : 'text-red-600') : 'text-gray-400'
-                  )}>
-                    {ltvNum > 0 ? `${ltvNum.toFixed(1)}%` : '-'}
-                  </span>
-                  <span className="text-xs text-gray-500 block mt-0.5">
-                    {ltvNum > 0 ? (isWithinLimit ? `Within ${ltvLimit}% limit` : `Exceeds ${ltvLimit}% limit`) : `Limit: ${ltvLimit}%`}
-                  </span>
-                </div>
-              )
-            })()}
-          </div>
-        </div>
       </div>
 
       {/* Footer */}
@@ -723,21 +457,7 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
   const [showClientPanel, setShowClientPanel] = useState(false)
 
   // Case type fields
-  const [propertyCategory, setPropertyCategory] = useState<PropertyCategory>(caseData.property_category || 'residential')
   const [caseType, setCaseType] = useState<CaseTypeValue>(caseData.case_type || 'fully_packaged')
-
-  // Property fields
-  const [propertyType, setPropertyType] = useState(caseData.property_type)
-  const [emirate, setEmirate] = useState<Emirate>(caseData.emirate || 'dubai')
-  const [transactionType, setTransactionType] = useState(caseData.transaction_type)
-  const [propertyValue, setPropertyValue] = useState(caseData.property_value)
-  const [loanAmount, setLoanAmount] = useState(caseData.loan_amount)
-  const [developer, setDeveloper] = useState(caseData.developer || '')
-  const [isFirstProperty, setIsFirstProperty] = useState(caseData.is_first_property ?? true)
-
-  // Loan fields
-  const [tenureYears, setTenureYears] = useState(caseData.tenure_years)
-  const [tenureMonths, setTenureMonths] = useState(caseData.tenure_months || 0)
 
   // Bank fields
   const [bank, setBank] = useState(caseData.bank || '')
@@ -754,7 +474,6 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
   const changeStageMutation = useChangeCaseStage()
 
   const isTerminal = isTerminalStage(caseData.stage)
-  const ltv = calculateLTV(loanAmount, propertyValue)
 
   // Get Stage SLA status
   const stageSLA = caseData.stage_sla_status
@@ -770,73 +489,19 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
   // Track changes
   useEffect(() => {
     const changed =
-      propertyCategory !== (caseData.property_category || 'residential') ||
       caseType !== (caseData.case_type || 'fully_packaged') ||
-      propertyType !== caseData.property_type ||
-      emirate !== (caseData.emirate || 'dubai') ||
-      transactionType !== caseData.transaction_type ||
-      propertyValue !== caseData.property_value ||
-      loanAmount !== caseData.loan_amount ||
-      developer !== (caseData.developer || '') ||
-      isFirstProperty !== (caseData.is_first_property ?? true) ||
-      tenureYears !== caseData.tenure_years ||
-      tenureMonths !== (caseData.tenure_months || 0) ||
       bank !== (caseData.bank || '') ||
       mortgageType !== (caseData.mortgage_type || 'conventional') ||
       rateType !== (caseData.rate_type || 'fixed') ||
       rate !== (caseData.rate || '') ||
       fixedPeriod !== (caseData.fixed_period || '')
     _setHasChanges(changed)
-  }, [propertyCategory, caseType, propertyType, emirate, transactionType, propertyValue, loanAmount, developer, isFirstProperty, tenureYears, tenureMonths, bank, mortgageType, rateType, rate, fixedPeriod, caseData])
+  }, [caseType, bank, mortgageType, rateType, rate, fixedPeriod, caseData])
 
   const handleSave = async () => {
     setSaveError(null)
 
     const errors: string[] = []
-
-    // Property validation
-    if (!propertyValue) {
-      errors.push('Property value is required')
-    } else {
-      const propVal = parseFloat(propertyValue)
-      if (isNaN(propVal) || propVal <= 0) {
-        errors.push('Invalid property value (must be a positive number)')
-      }
-    }
-
-    // Loan validation
-    if (!loanAmount) {
-      errors.push('Loan amount is required')
-    } else {
-      const loanVal = parseFloat(loanAmount)
-      const propVal = parseFloat(propertyValue) || 0
-      if (isNaN(loanVal) || loanVal <= 0) {
-        errors.push('Invalid loan amount (must be a positive number)')
-      } else if (propVal > 0 && loanVal > propVal) {
-        errors.push(`Loan amount cannot exceed property value (AED ${propVal.toLocaleString()})`)
-      }
-    }
-
-    // LTV validation
-    if (loanAmount && propertyValue) {
-      const loanVal = parseFloat(loanAmount)
-      const propVal = parseFloat(propertyValue)
-      if (propVal > 0 && loanVal > 0) {
-        const ltvValue = (loanVal / propVal) * 100
-        const ltvLimit = propertyType === 'off_plan' ? 50 : (isFirstProperty ? 80 : 65)
-        if (ltvValue > ltvLimit) {
-          errors.push(`LTV ${ltvValue.toFixed(1)}% exceeds ${ltvLimit}% limit for ${propertyType === 'off_plan' ? 'under construction' : isFirstProperty ? 'first property' : 'second+ property'}`)
-        }
-      }
-    }
-
-    // Tenure validation
-    if (tenureYears < 1 || tenureYears > 25) {
-      errors.push('Invalid tenure (1-25 years)')
-    }
-    if (tenureMonths < 0 || tenureMonths > 11) {
-      errors.push('Invalid months (0-11)')
-    }
 
     // Bank validation
     if (!bank.trim()) {
@@ -872,16 +537,6 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
         id: caseData.id,
         data: {
           case_type: caseType,
-          property_category: propertyCategory,
-          property_type: propertyType,
-          emirate: emirate,
-          transaction_type: transactionType,
-          property_value: propertyValue,
-          loan_amount: loanAmount,
-          developer: developer || undefined,
-          is_first_property: isFirstProperty,
-          tenure_years: tenureYears,
-          tenure_months: tenureMonths,
           bank: bank || undefined,
           mortgage_type: mortgageType,
           rate_type: rateType,
@@ -889,7 +544,7 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
           fixed_period: fixedPeriod || undefined,
         },
       })
-      onClose()
+      // Panel stays open after save so user can continue editing
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to save case')
     }
@@ -898,6 +553,8 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
   const handleStageChange = async (newStage: CaseStage) => {
     try {
       await changeStageMutation.mutateAsync({ id: caseData.id, stage: newStage })
+      caseToast.stageChanged(newStage)
+      onClose()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to change stage')
     }
@@ -914,12 +571,18 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
             <h2 className="text-lg font-semibold text-gray-900">
               Case #{caseData.id.slice(0, 8).toUpperCase()}
             </h2>
-            <StageDropdown
-              stage={caseData.stage}
-              onChange={handleStageChange}
-              isLoading={changeStageMutation.isPending}
-              disabled={isReadOnly}
-            />
+            {isTerminal ? (
+              <span className={cn('px-2 py-0.5 text-xs font-medium rounded', stageColors[caseData.stage])}>
+                {getStageLabel(caseData.stage)}
+              </span>
+            ) : (
+              <StageDropdown
+                stage={caseData.stage}
+                onChange={handleStageChange}
+                isLoading={changeStageMutation.isPending}
+                disabled={isReadOnly}
+              />
+            )}
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
             <X className="h-5 w-5" />
@@ -1004,38 +667,6 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
                 </FormField>
               </div>
 
-              {/* Property Category Toggle */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => !isTerminal && setPropertyCategory('residential')}
-                  disabled={isTerminal}
-                  className={cn(
-                    'flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center gap-1',
-                    propertyCategory === 'residential'
-                      ? 'border-[#1e3a5f] bg-[#1e3a5f]/5'
-                      : 'border-gray-200 hover:border-gray-300',
-                    isTerminal && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  <span className="text-sm font-medium text-gray-900">Residential</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => !isTerminal && setPropertyCategory('commercial')}
-                  disabled={isTerminal}
-                  className={cn(
-                    'flex-1 py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center gap-1',
-                    propertyCategory === 'commercial'
-                      ? 'border-[#1e3a5f] bg-[#1e3a5f]/5'
-                      : 'border-gray-200 hover:border-gray-300',
-                    isTerminal && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  <span className="text-sm font-medium text-gray-900">Commercial</span>
-                </button>
-              </div>
-
               {/* Case Type Toggle */}
               <div className="flex gap-2">
                 <button
@@ -1066,146 +697,6 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
                 >
                   Assisted
                 </button>
-              </div>
-            </div>
-
-            {/* Property Details */}
-            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Property</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Emirate *">
-                  <select
-                    value={emirate}
-                    onChange={(e) => setEmirate(e.target.value as Emirate)}
-                    disabled={isTerminal}
-                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white disabled:opacity-50"
-                  >
-                    {Object.entries(EMIRATE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </FormField>
-                <FormField label="Transaction Type *">
-                  <select
-                    value={transactionType}
-                    onChange={(e) => setTransactionType(e.target.value as 'primary_purchase' | 'resale' | 'buyout_equity' | 'buyout' | 'equity')}
-                    disabled={isTerminal}
-                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white disabled:opacity-50"
-                  >
-                    <option value="primary_purchase">Primary Purchase</option>
-                    <option value="resale">Resale</option>
-                    <option value="buyout_equity">Buyout + Equity</option>
-                    <option value="buyout">Buyout</option>
-                    <option value="equity">Equity</option>
-                  </select>
-                </FormField>
-                <FormField label="Property Status *">
-                  <select
-                    value={propertyType}
-                    onChange={(e) => setPropertyType(e.target.value as 'ready' | 'off_plan')}
-                    disabled={isTerminal}
-                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white disabled:opacity-50"
-                  >
-                    <option value="ready">Ready</option>
-                    <option value="off_plan">Under Construction</option>
-                  </select>
-                </FormField>
-                <FormField label="Property Value (AED) *">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={propertyValue}
-                    onChange={(e) => setPropertyValue(sanitizeAmount(e.target.value))}
-                    disabled={isTerminal}
-                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] disabled:opacity-50"
-                  />
-                </FormField>
-              </div>
-
-              {/* First Property Toggle */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => !isTerminal && setIsFirstProperty(true)}
-                  disabled={isTerminal}
-                  className={cn(
-                    'flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all',
-                    isFirstProperty
-                      ? 'bg-[#1e3a5f] text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-                    isTerminal && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  First Property
-                </button>
-                <button
-                  type="button"
-                  onClick={() => !isTerminal && setIsFirstProperty(false)}
-                  disabled={isTerminal}
-                  className={cn(
-                    'flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all',
-                    !isFirstProperty
-                      ? 'bg-[#1e3a5f] text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-                    isTerminal && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  Second+ Property
-                </button>
-              </div>
-
-              {propertyType === 'off_plan' && (
-                <FormField label="Developer">
-                  <input
-                    type="text"
-                    value={developer}
-                    onChange={(e) => setDeveloper(e.target.value)}
-                    disabled={isTerminal}
-                    placeholder="e.g., Emaar, DAMAC"
-                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] disabled:opacity-50"
-                  />
-                </FormField>
-              )}
-            </div>
-
-            {/* Loan Details */}
-            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Loan</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField label="Loan Amount (AED) *">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={loanAmount}
-                    onChange={(e) => setLoanAmount(sanitizeAmount(e.target.value))}
-                    disabled={isTerminal}
-                    className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] disabled:opacity-50"
-                  />
-                </FormField>
-                <FormField label="Mortgage Term *">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={25}
-                      value={tenureYears}
-                      onChange={(e) => setTenureYears(parseInt(e.target.value) || 1)}
-                      disabled={isTerminal}
-                      className="w-16 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] text-center disabled:opacity-50"
-                    />
-                    <span className="text-xs text-gray-500">yrs</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={11}
-                      value={tenureMonths}
-                      onChange={(e) => setTenureMonths(parseInt(e.target.value) || 0)}
-                      disabled={isTerminal}
-                      className="w-16 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] text-center disabled:opacity-50"
-                    />
-                    <span className="text-xs text-gray-500">mo</span>
-                  </div>
-                </FormField>
               </div>
             </div>
 
@@ -1268,31 +759,6 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
               </div>
             </div>
 
-            {/* Eligibility / LTV Summary */}
-            <div className="bg-white border border-gray-100 rounded-xl p-4 space-y-4">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Eligibility</h3>
-              <div className="grid grid-cols-1">
-                {(() => {
-                  const ltvNum = parseFloat(ltv)
-                  const ltvLimit = propertyType === 'off_plan' ? 50 : (isFirstProperty ? 80 : 65)
-                  const isWithinLimit = ltvNum > 0 && ltvNum <= ltvLimit
-                  return (
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">LTV (Loan to Value)</span>
-                      <span className={cn(
-                        'text-lg font-bold',
-                        ltvNum > 0 ? (isWithinLimit ? 'text-green-600' : 'text-red-600') : 'text-gray-400'
-                      )}>
-                        {ltvNum > 0 ? `${ltvNum.toFixed(1)}%` : '-'}
-                      </span>
-                      <span className="text-xs text-gray-500 block mt-0.5">
-                        {ltvNum > 0 ? (isWithinLimit ? `Within ${ltvLimit}% limit` : `Exceeds ${ltvLimit}% limit`) : `Limit: ${ltvLimit}%`}
-                      </span>
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
           </div>
 
           {/* Footer */}
@@ -1392,6 +858,11 @@ function StageDropdown({
             <option key={s.value} value={s.value}>{s.label}</option>
           ))}
         </optgroup>
+        <optgroup label="Queries">
+          {CASE_STAGES.query.map((s) => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </optgroup>
         <optgroup label="Hold">
           {CASE_STAGES.hold.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>
@@ -1418,7 +889,7 @@ function StageDropdown({
             <div className="p-4">
               <div className="p-2.5 bg-amber-50 border border-amber-100 rounded-lg">
                 <p className="text-xs text-amber-700">
-                  This action cannot be easily undone. The case will be marked as completed.
+                  This action cannot be undone.
                 </p>
               </div>
             </div>

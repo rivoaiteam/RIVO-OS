@@ -7,7 +7,9 @@ and status management actions.
 
 import logging
 
-from django.db.models import Q
+from django.db.models import Q, F, ExpressionWrapper, DurationField
+from django.db.models.functions import Now
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -60,7 +62,7 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     queryset = Lead.objects.select_related(
         'sub_source__source__channel'
-    ).all().order_by('-created_at')
+    ).filter(converted_client_id__isnull=True).order_by('-created_at')
     permission_classes = [IsAuthenticated]
     pagination_class = LeadPagination
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
@@ -102,6 +104,24 @@ class LeadViewSet(viewsets.ModelViewSet):
         channel_id = self.request.query_params.get('channel_id', '').strip()
         if channel_id:
             queryset = queryset.filter(sub_source__source__channel_id=channel_id)
+
+        # SLA status filter - filter based on sla_timer values
+        sla_status_filter = self.request.query_params.get('sla_status', '').strip()
+        if sla_status_filter:
+            matching_ids = []
+            for lead in queryset:
+                timer = lead.sla_timer
+                display = timer.get('display', '')
+                is_overdue = timer.get('is_overdue', False) or 'overdue' in display.lower()
+                is_completed = display == 'Completed'
+
+                if sla_status_filter == 'completed' and is_completed:
+                    matching_ids.append(lead.id)
+                elif sla_status_filter == 'overdue' and is_overdue:
+                    matching_ids.append(lead.id)
+                elif sla_status_filter == 'remaining' and not is_overdue and not is_completed and display and display != 'No SLA':
+                    matching_ids.append(lead.id)
+            queryset = queryset.filter(id__in=matching_ids)
 
         return queryset
 

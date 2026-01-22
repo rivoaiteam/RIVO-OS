@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from audit.models import AuditableModel
 from channels.models import SubSource
+from common.sla import format_sla_duration
 
 
 class LeadStatus(models.TextChoices):
@@ -186,20 +187,9 @@ class Lead(AuditableModel):
         is_overdue = remaining_minutes < 0
 
         if is_overdue:
-            overdue_minutes = abs(remaining_minutes)
-            hours = overdue_minutes // 60
-            minutes = overdue_minutes % 60
-            if hours > 0:
-                display = f"Overdue by {hours}h {minutes}m"
-            else:
-                display = f"Overdue by {minutes}m"
+            display = format_sla_duration(abs(remaining_minutes), 'overdue')
         else:
-            hours = remaining_minutes // 60
-            minutes = remaining_minutes % 60
-            if hours > 0:
-                display = f"{hours}h {minutes}m"
-            else:
-                display = f"{minutes}m"
+            display = format_sla_duration(remaining_minutes, 'remaining')
 
         return {
             'remaining_minutes': remaining_minutes,

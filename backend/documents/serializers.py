@@ -12,10 +12,6 @@ from documents.models import (
     ClientDocument,
     CaseDocument,
     DocumentLevel,
-    ApplicantType,
-    ApplicantRole,
-    DocumentStatus,
-    UploadSource,
     ACCEPTED_FORMATS,
     MAX_FILE_SIZE,
 )
@@ -41,6 +37,7 @@ class DocumentTypeSerializer(serializers.ModelSerializer):
             'applicant_type',
             'display_order',
             'is_system',
+            'client',
             'created_at',
             'updated_at',
         ]
@@ -50,7 +47,10 @@ class DocumentTypeSerializer(serializers.ModelSerializer):
 class DocumentTypeCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating custom document types.
+
+    Custom document types are client-specific - they belong to a particular client.
     """
+    client_id = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
         model = DocumentType
@@ -61,6 +61,7 @@ class DocumentTypeCreateSerializer(serializers.ModelSerializer):
             'description',
             'applicant_type',
             'display_order',
+            'client_id',
         ]
 
     def validate_level(self, value):
@@ -72,7 +73,12 @@ class DocumentTypeCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        """Create a custom document type."""
+        """Create a custom document type linked to a client."""
+        # Extract client_id and set as client
+        client_id = validated_data.pop('client_id', None)
+        if client_id:
+            validated_data['client_id'] = client_id
+
         # Custom types are not system types
         validated_data['is_system'] = False
         # Set high display_order so custom docs appear at bottom

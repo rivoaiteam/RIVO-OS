@@ -71,39 +71,46 @@ function formatRemainingTime(hours: number | null, status: SLAStatus): string {
 /**
  * Get color classes based on SLA status.
  */
-function getStatusColors(status: SLAStatus): { text: string; bg: string; icon: string } {
+function getStatusColors(status: SLAStatus): { text: string; bg: string; icon: string; border: string } {
   switch (status) {
     case 'ok':
+      // Neutral color for time remaining (only completed is green)
       return {
-        text: 'text-green-700',
-        bg: 'bg-green-50',
-        icon: 'text-green-500',
+        text: 'text-gray-700',
+        bg: 'bg-gray-50',
+        icon: 'text-gray-500',
+        border: 'border-gray-200',
       }
     case 'warning':
       return {
         text: 'text-amber-700',
         bg: 'bg-amber-50',
-        icon: 'text-amber-500',
+        icon: 'text-amber-600',
+        border: 'border-amber-200',
       }
     case 'overdue':
       return {
         text: 'text-red-700',
         bg: 'bg-red-50',
-        icon: 'text-red-500',
+        icon: 'text-red-600',
+        border: 'border-red-200',
       }
     case 'completed':
+      // Only completed status shows green
       return {
         text: 'text-emerald-700',
         bg: 'bg-emerald-50',
-        icon: 'text-emerald-500',
+        icon: 'text-emerald-600',
+        border: 'border-emerald-200',
       }
     case 'not_started':
     case 'no_sla':
     default:
       return {
-        text: 'text-gray-500',
+        text: 'text-gray-600',
         bg: 'bg-gray-50',
-        icon: 'text-gray-400',
+        icon: 'text-gray-500',
+        border: 'border-gray-200',
       }
   }
 }
@@ -138,19 +145,19 @@ export function SLACountdown({
   // Size classes
   const sizeClasses = {
     sm: {
-      container: 'px-2 py-1',
+      container: 'px-2.5 py-1.5',
       text: 'text-xs',
-      icon: 'h-3 w-3',
+      icon: 'h-3.5 w-3.5',
       label: 'text-[10px]',
     },
     md: {
-      container: 'px-3 py-1.5',
+      container: 'px-3 py-2',
       text: 'text-sm',
       icon: 'h-4 w-4',
       label: 'text-xs',
     },
     lg: {
-      container: 'px-4 py-2',
+      container: 'px-4 py-2.5',
       text: 'text-base',
       icon: 'h-5 w-5',
       label: 'text-sm',
@@ -160,19 +167,17 @@ export function SLACountdown({
   const sizeConfig = sizeClasses[size]
 
   return (
-    <div className={cn('flex flex-col', className)}>
+    <div className={cn('inline-flex items-center gap-2', className)}>
       {label && (
-        <span className={cn('font-medium text-gray-500 mb-1', sizeConfig.label)}>
+        <span className={cn('font-medium text-gray-500', sizeConfig.text)}>
           {label}
-          {stageName && <span className="font-normal"> - {stageName}</span>}
+          {stageName && <span className="font-normal"> - {stageName}</span>}:
         </span>
       )}
       <div
         className={cn(
           'inline-flex items-center gap-1.5 rounded-md font-medium',
-          colors.bg,
           colors.text,
-          sizeConfig.container,
           sizeConfig.text
         )}
       >

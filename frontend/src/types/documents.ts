@@ -32,6 +32,7 @@ export interface DocumentType {
   applicant_type: ApplicantType
   display_order: number
   is_system: boolean
+  client: string | null  // Client ID for custom client-specific document types
   created_at: string
   updated_at: string
 }
@@ -43,6 +44,7 @@ export interface CreateDocumentTypeData {
   description?: string
   applicant_type?: ApplicantType
   display_order?: number
+  client_id?: string  // For client-specific custom document types
 }
 
 // Base Document
@@ -109,7 +111,11 @@ export interface DocumentChecklistItem {
 export interface DocumentChecklistResponse {
   primary: DocumentChecklistItem[]
   co_applicant: DocumentChecklistItem[] | null
+  conditional?: DocumentChecklistItem[]
+  custom?: DocumentChecklistItem[]  // Client-specific custom document types
+  other_documents?: DocumentChecklistItem[]  // Docs from previous profile
   is_joint_application: boolean
+  category?: string
 }
 
 // Display Labels

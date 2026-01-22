@@ -40,7 +40,7 @@ class CaseListSerializer(serializers.ModelSerializer):
     """
     Serializer for listing cases.
 
-    Returns: id, client (nested summary), stage, property_value, loan_amount, bank, created_at
+    Returns: id, client (nested summary), stage, property_value, loan_amount, bank, created_at, stage_sla_status
     """
     client = ClientSummarySerializer(read_only=True)
     stage_display = serializers.CharField(source='get_stage_display', read_only=True)
@@ -49,6 +49,7 @@ class CaseListSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True
     )
+    stage_sla_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Case
@@ -62,8 +63,13 @@ class CaseListSerializer(serializers.ModelSerializer):
             'ltv_percentage',
             'bank',
             'created_at',
+            'stage_sla_status',
         ]
         read_only_fields = ['id', 'created_at']
+
+    def get_stage_sla_status(self, obj: Case) -> dict:
+        """Get Stage SLA status for list view."""
+        return obj.stage_sla_status
 
 
 class CaseDetailSerializer(serializers.ModelSerializer):

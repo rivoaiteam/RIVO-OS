@@ -226,6 +226,15 @@ Recommended implementation sequence:
 | <24h overdue | "Xh overdue" | Red |
 | >=24h overdue | "Xd overdue" | Red |
 
+### SLA Filter on List Pages
+All three list pages (Leads, Clients, Cases) have an SLA status dropdown filter:
+- **All SLA** - Show all items
+- **Completed** - Items with `display == 'Completed'`
+- **Overdue** - Items with `is_overdue == true` or `status == 'overdue'`
+- **Remaining** - Items with time remaining (not overdue, not completed)
+
+Filter logic uses the actual SLA status values from the model properties (`sla_timer`, `first_contact_sla_status`, `client_to_case_sla_status`, `stage_sla_status`).
+
 ### Out of Scope (MVP)
 - No notifications or email alerts
 - No automatic escalation

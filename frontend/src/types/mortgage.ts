@@ -7,24 +7,31 @@
 
 export type LeadStatus = 'active' | 'declined'
 
-export type ClientStatus = 'active' | 'converted' | 'declined' | 'not_proceeding'
+export type ClientStatus = 'active' | 'declined' | 'not_proceeding'
 
 export type CaseStage =
-  // Active stages
+  // Active stages (main flow)
   | 'processing'
-  | 'document_collection'
-  | 'bank_submission'
-  | 'bank_processing'
-  | 'offer_issued'
-  | 'offer_accepted'
-  | 'property_valuation'
-  | 'final_approval'
-  | 'property_transfer'
-  | 'property_transferred'
+  | 'submitted_to_bank'
+  | 'under_review'
+  | 'submitted_to_credit'
+  | 'valuation_initiated'
+  | 'valuation_report_received'
+  | 'fol_requested'
+  | 'fol_received'
+  | 'fol_signed'
+  | 'disbursed'
+  | 'final_documents'
+  | 'mc_received'
+  // Query stages (side tracks)
+  | 'sales_queries'
+  | 'credit_queries'
+  | 'disbursal_queries'
   // Hold
   | 'on_hold'
-  // Terminal (also includes property_transferred, declined, not_proceeding)
-  | 'declined'
+  // Terminal
+  | 'property_transferred'
+  | 'rejected'
   | 'not_proceeding'
 
 // Reference Types
@@ -55,6 +62,8 @@ export type Emirate = 'dubai' | 'abu_dhabi' | 'sharjah' | 'ajman' | 'ras_al_khai
 
 export type FixedPeriod = '1' | '2' | '3' | '4' | '5'
 
+export type MaritalStatus = 'single' | 'married' | 'divorced' | 'widowed'
+
 // SLA Status Types
 
 export type SLAStatusValue = 'ok' | 'warning' | 'overdue' | 'completed' | 'not_started' | 'no_sla'
@@ -64,6 +73,13 @@ export interface SLAStatusData {
   remaining_hours: number | null
   display: string | null
   stage_name?: string | null
+}
+
+export interface LtvStatusData {
+  ltv: number | null
+  limit: number
+  within_limit: boolean | null
+  display: string
 }
 
 // Nested Types for API responses
@@ -174,6 +190,9 @@ export interface ClientListItem {
   status: ClientStatus
   application_type: ApplicationType | null
   dbr_available: string | null
+  property_value: string | null
+  loan_amount: string | null
+  ltv_status: LtvStatusData | null
   sub_source: SubSourceSummary
   sla_display: string | null
   active_case_id: ClientCaseSummary[] | null
@@ -211,6 +230,18 @@ export interface ClientData {
   auto_loan_emi: string | null
   personal_loan_emi: string | null
   existing_mortgage_emi: string | null
+  // Property Details
+  property_category: PropertyCategory | null
+  property_type: PropertyType | null
+  emirate: Emirate | null
+  transaction_type: TransactionType | null
+  property_value: string | null
+  is_first_property: boolean
+  developer: string | null
+  // Loan Details
+  loan_amount: string | null
+  tenure_years: number
+  tenure_months: number
   // Intent
   notes: string | null
   timeline: Timeline | null
@@ -220,13 +251,19 @@ export interface ClientData {
   converted_from_lead: string | null
   // Co-Applicant (for joint applications)
   co_applicant: CoApplicantData | null
+  // Extra Details (for bank forms)
+  extra_details: ClientExtraDetailsData | null
   // Calculated Fields
   total_cc_liability: string
   total_loan_emis: string
   total_monthly_liabilities: string
   dbr_available: string
   max_loan_amount: string
-  can_create_case: boolean
+  ltv_status: LtvStatusData
+  can_create_case: {
+    valid: boolean
+    reasons: string[]
+  }
   // SLA Status Fields
   first_contact_sla_status?: SLAStatusData | null
   client_to_case_sla_status?: SLAStatusData | null
@@ -237,6 +274,8 @@ export interface ClientData {
     name: string
     email: string
   } | null
+  // Cases linked to this client
+  cases: ClientCaseSummary[] | null
   // Timestamps
   created_at: string
   updated_at: string
@@ -268,6 +307,18 @@ export interface CreateClientData {
   auto_loan_emi?: string
   personal_loan_emi?: string
   existing_mortgage_emi?: string
+  // Property Details
+  property_category?: PropertyCategory
+  property_type?: PropertyType
+  emirate?: Emirate
+  transaction_type?: TransactionType
+  property_value?: string
+  is_first_property?: boolean
+  developer?: string
+  // Loan Details
+  loan_amount?: string
+  tenure_years?: number
+  tenure_months?: number
   // Intent
   notes?: string
   timeline?: Timeline
@@ -303,6 +354,18 @@ export interface UpdateClientData {
   auto_loan_emi?: string
   personal_loan_emi?: string
   existing_mortgage_emi?: string
+  // Property Details
+  property_category?: PropertyCategory
+  property_type?: PropertyType
+  emirate?: Emirate
+  transaction_type?: TransactionType
+  property_value?: string
+  is_first_property?: boolean
+  developer?: string
+  // Loan Details
+  loan_amount?: string
+  tenure_years?: number
+  tenure_months?: number
   // Intent
   notes?: string
   timeline?: Timeline
@@ -326,6 +389,76 @@ export interface UpdateCoApplicantData {
   auto_loan_emi?: string
   personal_loan_emi?: string
   existing_mortgage_emi?: string
+}
+
+// Client Extra Details Types
+
+export interface ClientExtraDetailsData {
+  id: string
+  // Personal Information
+  marital_status: MaritalStatus | ''
+  spouse_name: string
+  spouse_contact: string
+  dependents: number | null
+  children_count: number | null
+  children_in_school: number | null
+  qualification: string
+  mailing_address: string
+  mother_maiden_name: string
+  // Work Details
+  job_title: string
+  company_industry: string
+  years_in_occupation: number | null
+  years_in_current_company: number | null
+  years_in_business: number | null
+  company_employee_count: number | null
+  office_address: string
+  office_po_box: string
+  office_landline: string
+  work_email: string
+  company_hr_email: string
+  // References
+  ref_1_name: string
+  ref_1_relationship: string
+  ref_1_mobile: string
+  ref_2_name: string
+  ref_2_relationship: string
+  ref_2_mobile: string
+  // Timestamps
+  created_at: string
+  updated_at: string
+}
+
+export interface UpdateClientExtraDetailsData {
+  // Personal Information
+  marital_status?: MaritalStatus | ''
+  spouse_name?: string
+  spouse_contact?: string
+  dependents?: number | null
+  children_count?: number | null
+  children_in_school?: number | null
+  qualification?: string
+  mailing_address?: string
+  mother_maiden_name?: string
+  // Work Details
+  job_title?: string
+  company_industry?: string
+  years_in_occupation?: number | null
+  years_in_current_company?: number | null
+  years_in_business?: number | null
+  company_employee_count?: number | null
+  office_address?: string
+  office_po_box?: string
+  office_landline?: string
+  work_email?: string
+  company_hr_email?: string
+  // References
+  ref_1_name?: string
+  ref_1_relationship?: string
+  ref_1_mobile?: string
+  ref_2_name?: string
+  ref_2_relationship?: string
+  ref_2_mobile?: string
 }
 
 // Case Types
@@ -456,6 +589,8 @@ export interface LeadsQueryParams {
   page_size?: number
   search?: string
   status?: LeadStatus | 'all'
+  sub_source_id?: string
+  sla_status?: string
 }
 
 export interface ClientsQueryParams {
@@ -464,6 +599,8 @@ export interface ClientsQueryParams {
   search?: string
   status?: ClientStatus | 'all'
   application_type?: ApplicationType | 'all'
+  sub_source_id?: string
+  sla_status?: string
 }
 
 export interface CasesQueryParams {
@@ -472,27 +609,37 @@ export interface CasesQueryParams {
   search?: string
   stage?: CaseStage | 'all'
   bank?: string
+  sla_status?: string
 }
 
 // Stage Category Helpers
 
 export const ACTIVE_STAGES: CaseStage[] = [
   'processing',
-  'document_collection',
-  'bank_submission',
-  'bank_processing',
-  'offer_issued',
-  'offer_accepted',
-  'property_valuation',
-  'final_approval',
-  'property_transfer',
+  'submitted_to_bank',
+  'under_review',
+  'submitted_to_credit',
+  'valuation_initiated',
+  'valuation_report_received',
+  'fol_requested',
+  'fol_received',
+  'fol_signed',
+  'disbursed',
+  'final_documents',
+  'mc_received',
+]
+
+export const QUERY_STAGES: CaseStage[] = [
+  'sales_queries',
+  'credit_queries',
+  'disbursal_queries',
 ]
 
 export const HOLD_STAGES: CaseStage[] = ['on_hold']
 
 export const TERMINAL_STAGES: CaseStage[] = [
   'property_transferred',
-  'declined',
+  'rejected',
   'not_proceeding',
 ]
 
@@ -505,24 +652,29 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
 
 export const CLIENT_STATUS_LABELS: Record<ClientStatus, string> = {
   active: 'Active',
-  converted: 'Converted',
   declined: 'Declined',
   not_proceeding: 'Not Proceeding',
 }
 
 export const CASE_STAGE_LABELS: Record<CaseStage, string> = {
   processing: 'Processing',
-  document_collection: 'Document Collection',
-  bank_submission: 'Bank Submission',
-  bank_processing: 'Bank Processing',
-  offer_issued: 'Offer Issued',
-  offer_accepted: 'Offer Accepted',
-  property_valuation: 'Property Valuation',
-  final_approval: 'Final Approval',
-  property_transfer: 'Property Transfer',
-  property_transferred: 'Property Transferred',
+  submitted_to_bank: 'Submitted to Bank',
+  under_review: 'Under Review',
+  submitted_to_credit: 'Submitted to Credit',
+  valuation_initiated: 'Valuation Initiated',
+  valuation_report_received: 'Valuation Report Received',
+  fol_requested: 'FOL Requested',
+  fol_received: 'FOL Received',
+  fol_signed: 'FOL Signed',
+  disbursed: 'Disbursed',
+  final_documents: 'Final Documents',
+  mc_received: 'MC Received',
+  sales_queries: 'Sales Queries',
+  credit_queries: 'Credit Queries',
+  disbursal_queries: 'Disbursal Queries',
   on_hold: 'On Hold',
-  declined: 'Declined',
+  property_transferred: 'Property Transferred',
+  rejected: 'Rejected',
   not_proceeding: 'Not Proceeding',
 }
 
@@ -616,4 +768,11 @@ export const SLA_STATUS_LABELS: Record<SLAStatusValue, string> = {
   completed: 'Completed',
   not_started: 'Not Started',
   no_sla: 'No SLA',
+}
+
+export const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {
+  single: 'Single',
+  married: 'Married',
+  divorced: 'Divorced',
+  widowed: 'Widowed',
 }

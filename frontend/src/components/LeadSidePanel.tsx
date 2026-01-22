@@ -6,7 +6,11 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2, AlertCircle, UserPlus } from 'lucide-react'
 import { useLead, useUpdateLead, useConvertLeadToClient, useChangeLeadStatus } from '@/hooks/useLeads'
+import { useAuth } from '@/contexts/AuthContext'
+import { leadToast } from '@/lib/toastMessages'
 import { SLACountdown } from '@/components/SLACountdown'
+import { FormField } from '@/components/ui/FormField'
+import { SidePanelWrapper } from '@/components/ui/SidePanelWrapper'
 import type { LeadStatus } from '@/types/mortgage'
 import { cn } from '@/lib/utils'
 
@@ -21,10 +25,14 @@ interface LeadSidePanelProps {
 }
 
 export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
+  const { user } = useAuth()
   const { data: lead, isLoading, error } = useLead(leadId || '')
   const updateMutation = useUpdateLead()
   const convertMutation = useConvertLeadToClient()
   const changeStatusMutation = useChangeLeadStatus()
+
+  // Managers have read-only access
+  const isReadOnly = user?.role === 'manager'
 
   // Local form state
   const [name, setName] = useState('')
@@ -74,10 +82,8 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
     try {
       await changeStatusMutation.mutateAsync({ id: leadId, status: newStatus })
       setSaveError(null)
-      // Close panel when lead is declined
-      if (newStatus === 'declined') {
-        onClose()
-      }
+      leadToast.statusChanged(newStatus)
+      onClose()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to update status')
       setStatus(lead.status) // Revert on error
@@ -91,6 +97,8 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
     try {
       await convertMutation.mutateAsync(leadId)
       setSaveError(null)
+      leadToast.converted()
+      onClose()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Failed to convert lead')
     }
@@ -111,17 +119,7 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
   if (!leadId) return null
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
-
-      {/* Panel */}
-      <div
-        className="fixed top-0 right-0 bottom-0 w-1/2 bg-white z-50 shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="lead-panel-title"
-      >
+    <SidePanelWrapper onClose={onClose}>
         {/* Header */}
         <div className="px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -134,11 +132,15 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
                   <span className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-100 text-emerald-700">
                     Converted
                   </span>
+                ) : lead.status === 'declined' ? (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
+                    Declined
+                  </span>
                 ) : (
                   <select
                     value={status}
                     onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
-                    disabled={changeStatusMutation.isPending}
+                    disabled={changeStatusMutation.isPending || isReadOnly}
                     className={cn(
                       'px-2 py-0.5 text-xs font-medium rounded border-0 focus:outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
                       statusColors[status]
@@ -248,8 +250,8 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
           ) : null}
         </div>
 
-        {/* Footer with Save and Convert buttons */}
-        {lead && !lead.converted_client && (
+        {/* Footer with Save and Convert buttons - only for active leads, hidden for read-only */}
+        {!isReadOnly && lead && lead.status === 'active' && !lead.converted_client && (
           <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 space-y-2">
             <button
               onClick={handleSave}
@@ -265,37 +267,25 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
                 'Save Changes'
               )}
             </button>
-            {lead.status === 'active' && (
-              <button
-                onClick={handleConvert}
-                disabled={convertMutation.isPending}
-                className="w-full py-2.5 border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {convertMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="h-4 w-4" />
-                    Convert to Client
-                  </>
-                )}
-              </button>
-            )}
+            <button
+              onClick={handleConvert}
+              disabled={convertMutation.isPending}
+              className="w-full py-2.5 border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {convertMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Converting...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4" />
+                  Convert to Client
+                </>
+              )}
+            </button>
           </div>
         )}
-      </div>
-    </>
-  )
-}
-
-function FormField({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={className}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      {children}
-    </div>
+    </SidePanelWrapper>
   )
 }

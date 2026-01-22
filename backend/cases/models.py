@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from audit.models import AuditableModel
 from clients.models import Client, ApplicationType, PropertyType, TransactionType
+from common.sla import format_sla_duration
 
 
 class CaseStage(models.TextChoices):
@@ -617,17 +618,26 @@ class Case(AuditableModel):
 
         Returns:
             dict with keys:
-                - status: 'ok' | 'warning' | 'overdue' | 'no_sla'
+                - status: 'ok' | 'warning' | 'overdue' | 'no_sla' | 'completed'
                 - remaining_hours: int (negative if overdue), None if no SLA
                 - display: Human-readable string
                 - stage: Current stage display name
         """
-        # Terminal stages and on_hold have no SLA
-        if self.is_terminal or self.is_on_hold:
+        # Terminal stages show as completed
+        if self.is_terminal:
+            return {
+                'status': 'completed',
+                'remaining_hours': None,
+                'display': 'Completed',
+                'stage': self.get_stage_display()
+            }
+
+        # On hold has no SLA
+        if self.is_on_hold:
             return {
                 'status': 'no_sla',
                 'remaining_hours': None,
-                'display': 'No SLA',
+                'display': 'On Hold',
                 'stage': self.get_stage_display()
             }
 
@@ -653,29 +663,13 @@ class Case(AuditableModel):
         # Determine status based on thresholds
         if remaining_minutes < 0:
             status = 'overdue'
-            overdue_minutes = abs(remaining_minutes)
-            if overdue_minutes >= 1440:  # 24 hours
-                days = overdue_minutes // 1440
-                display = f"{days}d overdue"
-            else:
-                hours = overdue_minutes // 60
-                display = f"{hours}h overdue" if hours > 0 else f"{overdue_minutes}m overdue"
+            display = format_sla_duration(abs(remaining_minutes), 'overdue')
         elif remaining_minutes < (sla_minutes * 0.5):  # Less than 50% remaining
             status = 'warning'
-            if remaining_minutes >= 1440:
-                days = remaining_minutes // 1440
-                display = f"{days}d remaining"
-            else:
-                hours = remaining_minutes // 60
-                display = f"{hours}h remaining" if hours > 0 else f"{remaining_minutes}m remaining"
+            display = format_sla_duration(remaining_minutes, 'remaining')
         else:
             status = 'ok'
-            if remaining_minutes >= 1440:
-                days = remaining_minutes // 1440
-                display = f"{days}d remaining"
-            else:
-                hours = remaining_minutes // 60
-                display = f"{hours}h remaining" if hours > 0 else f"{remaining_minutes}m remaining"
+            display = format_sla_duration(remaining_minutes, 'remaining')
 
         return {
             'status': status,

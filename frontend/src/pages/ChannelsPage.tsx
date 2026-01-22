@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 import { ChannelSidePanel } from '@/components/ChannelSidePanel'
 import { Pagination } from '@/components/Pagination'
+import { TablePageLayout, TableCard, TableContainer, PageLoading, PageError, StatusErrorToast } from '@/components/ui/TablePageLayout'
 
 const PAGE_SIZE = 10
 
@@ -86,16 +87,11 @@ export function ChannelsPage() {
     }
   }
 
-  if (isLoading) {
-    return <div className="h-full bg-white flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>
-  }
-
-  if (error) {
-    return <div className="h-full bg-white flex items-center justify-center"><div className="text-center"><AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" /><p className="text-gray-600">Failed to load channels</p><p className="text-sm text-gray-400 mt-1">{error.message}</p></div></div>
-  }
+  if (isLoading) return <PageLoading />
+  if (error) return <PageError entityName="channels" message={error.message} />
 
   return (
-    <div className="h-full">
+    <TablePageLayout>
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -134,14 +130,11 @@ export function ChannelsPage() {
       </div>
 
       {statusError && (
-        <div className="mx-6 mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-xs flex items-center gap-2">
-          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />{statusError}
-          <button onClick={() => setStatusError(null)} className="ml-auto text-red-400 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
-        </div>
+        <StatusErrorToast message={statusError} onClose={() => setStatusError(null)} />
       )}
 
-      <div className="mx-6 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-4 pt-4">
+      <TableCard>
+        <TableContainer isEmpty={paginatedChannels.length === 0} emptyMessage="No channels found">
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
@@ -167,18 +160,16 @@ export function ChannelsPage() {
               ))}
             </tbody>
           </table>
+        </TableContainer>
 
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            onPageChange={setCurrentPage}
-            itemLabel="channels"
-          />
-
-          {paginatedChannels.length === 0 && <div className="text-center py-8"><p className="text-xs text-gray-500">No channels found</p></div>}
-        </div>
-      </div>
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          onPageChange={setCurrentPage}
+          itemLabel="channels"
+        />
+      </TableCard>
 
       {/* Channel Side Panel (for channel only) */}
       {selectedChannelId && (
@@ -204,7 +195,7 @@ export function ChannelsPage() {
           onClose={() => setEditingSubSource(null)}
         />
       )}
-    </div>
+    </TablePageLayout>
   )
 }
 

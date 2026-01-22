@@ -13,7 +13,7 @@ from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
-from clients.models import Client, ClientStatus, CoApplicant, ApplicationType
+from clients.models import Client, ClientStatus, CoApplicant, ClientExtraDetails, ApplicationType
 from clients.serializers import (
     ClientListSerializer,
     ClientDetailSerializer,
@@ -22,6 +22,8 @@ from clients.serializers import (
     ClientChangeStatusSerializer,
     CoApplicantSerializer,
     CoApplicantCreateUpdateSerializer,
+    ClientExtraDetailsSerializer,
+    ClientExtraDetailsCreateUpdateSerializer,
 )
 from users.permissions import IsAuthenticated
 from users.models import User
@@ -113,10 +115,37 @@ class ClientViewSet(viewsets.ModelViewSet):
         if app_type_filter and app_type_filter in ApplicationType.values:
             queryset = queryset.filter(application_type=app_type_filter)
 
+        # Sub-source filter
+        sub_source_id = self.request.query_params.get('sub_source_id', '').strip()
+        if sub_source_id:
+            queryset = queryset.filter(sub_source_id=sub_source_id)
+
         # Source filter (by sub_source channel)
         channel_id = self.request.query_params.get('channel_id', '').strip()
         if channel_id:
             queryset = queryset.filter(sub_source__source__channel_id=channel_id)
+
+        # SLA status filter - filter based on sla_status values
+        sla_status_filter = self.request.query_params.get('sla_status', '').strip()
+        if sla_status_filter:
+            matching_ids = []
+            for client in queryset:
+                # Check both SLA types - use whichever applies
+                sla = client.first_contact_sla_status or client.client_to_case_sla_status
+                if not sla:
+                    continue
+                status = sla.get('status', '')
+                display = sla.get('display', '')
+                is_overdue = status == 'overdue' or 'overdue' in display.lower()
+                is_completed = status == 'completed' or display == 'Completed'
+
+                if sla_status_filter == 'completed' and is_completed:
+                    matching_ids.append(client.id)
+                elif sla_status_filter == 'overdue' and is_overdue:
+                    matching_ids.append(client.id)
+                elif sla_status_filter == 'remaining' and not is_overdue and not is_completed and display:
+                    matching_ids.append(client.id)
+            queryset = queryset.filter(id__in=matching_ids)
 
         return queryset
 
@@ -313,10 +342,6 @@ class ClientViewSet(viewsets.ModelViewSet):
 
             case = Case.objects.create(**case_data)
 
-            # Update client status to converted
-            client.status = ClientStatus.CONVERTED
-            client.save()
-
             # Return case data
             from cases.serializers import CaseDetailSerializer
             return Response(
@@ -365,6 +390,53 @@ class ClientViewSet(viewsets.ModelViewSet):
             logger.error(f'Co-applicant deletion failed: {str(e)}')
             return Response(
                 {'error': f'Failed to delete co-applicant: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get', 'post', 'patch'])
+    def extra_details(self, request, pk=None):
+        """
+        Get or update extra details for a client.
+
+        GET /clients/{id}/extra_details - Get extra details
+        POST/PATCH /clients/{id}/extra_details - Create/update extra details
+
+        Body (POST/PATCH): Extra details fields (personal, work, address, references)
+        """
+        client = self.get_object()
+
+        if request.method == 'GET':
+            try:
+                extra_details = client.extra_details
+                return Response(ClientExtraDetailsSerializer(extra_details).data)
+            except ClientExtraDetails.DoesNotExist:
+                return Response({}, status=status.HTTP_200_OK)
+
+        # POST or PATCH - create or update
+        serializer = ClientExtraDetailsCreateUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            # Check if extra details exist
+            try:
+                extra_details = client.extra_details
+                # Update existing
+                for field, value in serializer.validated_data.items():
+                    setattr(extra_details, field, value)
+                extra_details.save()
+            except ClientExtraDetails.DoesNotExist:
+                # Create new
+                extra_details = ClientExtraDetails.objects.create(
+                    client=client,
+                    **serializer.validated_data
+                )
+
+            return Response(ClientExtraDetailsSerializer(extra_details).data)
+
+        except Exception as e:
+            logger.error(f'Extra details update failed: {str(e)}')
+            return Response(
+                {'error': f'Failed to update extra details: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

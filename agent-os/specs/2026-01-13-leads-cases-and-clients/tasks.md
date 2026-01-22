@@ -354,6 +354,28 @@ Max Loan = Monthly Salary x 68
 - Bank icons wrapped in gray background container for visibility
 - Use onError handler to gracefully hide broken images
 
+### Shared Components (DRY Pattern)
+
+**Formatters (`/lib/formatters.ts`):**
+- `formatTimeAgo()` - Relative time display
+- `formatDate()` / `formatDateAE()` - Date formatting
+- `formatCurrencyAED()` - Currency formatting
+- `formatDbr()` / `getDbrColorClass()` - DBR display
+
+**Hooks:**
+- `useDebouncedSearch()` - Debounced search input with URL state
+
+**UI Components (`/components/ui/TablePageLayout.tsx`):**
+- `PageHeader` - Title, subtitle, action button
+- `StatusTabs` - Generic status filter tabs
+- `SearchInput` - Consistent search input styling
+- `TablePageLayout`, `TableCard`, `TableContainer` - Table page structure
+
+### Side Panel Behavior
+- **Create new** → Panel closes (task complete)
+- **Save/Update** → Panel stays open (user may continue editing)
+- **Status/Stage change** → Panel closes (context changed)
+
 ---
 
 *Rivo OS - Leads, Cases, and Clients Feature*

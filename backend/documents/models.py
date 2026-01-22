@@ -67,6 +67,7 @@ class DocumentType(models.Model):
     DocumentType model for defining document requirements.
 
     Supports both client-level (KYC) and case-level (bank forms) documents.
+    Custom document types can be client-specific (linked to a particular client).
     """
 
     id = models.UUIDField(
@@ -79,6 +80,15 @@ class DocumentType(models.Model):
     name = models.CharField(
         max_length=255,
         help_text='Name of the document type'
+    )
+
+    client = models.ForeignKey(
+        'clients.Client',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='custom_document_types',
+        help_text='Client this custom document type belongs to (null for system types)'
     )
 
     level = models.CharField(

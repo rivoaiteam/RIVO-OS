@@ -8,21 +8,27 @@ This feature adds real-time SLA countdown tracking across Clients and Cases, wit
 
 ## SLA Types
 
-### 1. First Contact SLA (Channel-level)
+### Simplified Model: One SLA per Client
+
+Each client has exactly ONE SLA based on their origin:
+
+### 1. First Contact SLA (for clients converted from leads)
+- **Applies to**: Only clients converted from leads
 - **Source**: Uses existing `sla_timer` on Client model (configured per Channel/Source/SubSource)
-- **Starts**: When client is created with a sub-source selected
+- **Starts**: When client is converted from a lead
 - **Stops when ANY of these occur**:
   - Any document is uploaded
   - Any note is added
   - Any state change (e.g., closed, rejected)
   - Client moves to Case
-- **Display**: Countdown on Client detail/side panel
+- **Display**: Countdown on Client list and side panel
 
-### 2. Client to Case SLA
+### 2. Client to Case SLA (for direct clients from trusted channels)
+- **Applies to**: Only direct clients created from trusted channels (not converted from leads)
 - **Source**: `ClientToCaseSLAConfig` model (default: 7 days / 168 hours)
-- **Starts**: AFTER First Contact SLA is satisfied
+- **Starts**: Immediately from client creation (`created_at`)
 - **Stops**: When a Case is created from the Client
-- **Display**: Countdown on Client detail/side panel (only shows after First Contact is done)
+- **Display**: Countdown on Client list and side panel
 
 ### 3. Stage SLA (Case-level)
 - **Source**: `StageSLAConfig` model (per stage transition)
@@ -55,15 +61,27 @@ This feature adds real-time SLA countdown tracking across Clients and Cases, wit
 ## Countdown Display Rules
 
 ### Format
-- **Non-overdue**: Hours only (e.g., "12h remaining", "48h remaining")
-- **Overdue**: Simple hours OR days
-  - Under 24h overdue: "6h overdue"
-  - 24h+ overdue: "2d overdue"
+- **< 1 hour**: Minutes (e.g., "45m remaining")
+- **< 24 hours**: Hours (e.g., "12h remaining")
+- **< 7 days**: Days and hours (e.g., "2d 5h remaining")
+- **< 30 days**: Weeks and days (e.g., "2w 3d remaining")
+- **≥ 30 days**: Months and weeks (e.g., "1mo 2w remaining")
 
 ### Visual Indicators
 - Green: Plenty of time remaining (> 50% of SLA)
 - Yellow/Orange: Warning (< 50% remaining)
 - Red: Overdue
+- Emerald: Completed (with checkmark icon)
+
+### List Page Display
+- Show one SLA per client (based on origin)
+- Clean display like leads: just the SLA text under the client name
+
+### Color Coding
+- **Gray**: Time remaining (ok status)
+- **Amber**: Warning (< 50% time remaining)
+- **Red**: Overdue
+- **Green (Emerald)**: Completed only
 
 ---
 
@@ -138,3 +156,53 @@ This feature adds real-time SLA countdown tracking across Clients and Cases, wit
 - `GET /api/sla-breaches/` - List all breached SLAs (for Manager Dashboard)
 - `PATCH /api/clients/{id}/reassign/` - Reassign client owner
 - `PATCH /api/cases/{id}/reassign/` - Reassign case owner
+- `GET /api/sub-sources/for_filter/` - Get sub-sources for filter dropdowns
+
+---
+
+## Source Filter Dropdowns
+
+### Backend Endpoint
+- **URL**: `GET /sub-sources/for_filter/`
+- **Query Params**: `trust` = 'trusted' | 'untrusted' | 'all' (default: 'all')
+- **Response**: Flat list of sub-sources with source and channel info
+  ```json
+  [
+    {
+      "id": "uuid",
+      "name": "SubSource Name",
+      "source_name": "Source Name",
+      "channel_name": "Channel Name",
+      "is_trusted": true
+    }
+  ]
+  ```
+
+### Frontend Usage
+| Page | Filter | Description |
+|------|--------|-------------|
+| LeadsPage | `untrusted` | Only untrusted channel sources |
+| ClientsPage | `all` | All sources (trusted + untrusted) |
+| ClientSidePanel | `trusted` | Only trusted channel sources (for new client creation) |
+
+### UI Consistency
+- All filter dropdowns use consistent styling: `h-8 px-3 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white min-w-[140px]`
+- Filter order: Search → Status Tabs → Source Dropdown
+
+---
+
+## Common SLA Formatting
+
+### Backend Utility
+- **Location**: `common/sla.py`
+- **Function**: `format_sla_duration(minutes: int, suffix: str = 'remaining') -> str`
+- Used by: Leads, Clients, and Cases models for consistent SLA display
+
+### Format Rules
+| Duration | Format Example |
+|----------|----------------|
+| < 60 minutes | "45m remaining" |
+| < 24 hours | "12h remaining" |
+| < 7 days | "2d 5h remaining" |
+| < 30 days | "2w 3d remaining" |
+| ≥ 30 days | "1mo 2w remaining" |

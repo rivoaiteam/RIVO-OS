@@ -20,16 +20,18 @@ import type {
  * Hook for fetching paginated leads.
  */
 export function useLeads(params: LeadsQueryParams = {}) {
-  const { page = 1, page_size = 10, search = '', status = 'all' } = params
+  const { page = 1, page_size = 10, search = '', status = 'all', sub_source_id, sla_status } = params
 
   return useQuery({
-    queryKey: ['leads', { page, page_size, search, status }],
+    queryKey: ['leads', { page, page_size, search, status, sub_source_id, sla_status }],
     queryFn: async (): Promise<PaginatedResponse<LeadListItem>> => {
       return await api.get<PaginatedResponse<LeadListItem>>('/leads/', {
         page,
         page_size,
         search: search || undefined,
         status: status !== 'all' ? status : undefined,
+        sub_source_id: sub_source_id || undefined,
+        sla_status: sla_status || undefined,
       })
     },
   })

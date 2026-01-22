@@ -13,7 +13,6 @@ import {
   useUploadClientDocument,
   useDeleteClientDocument,
   useCreateDocumentType,
-  useDeleteDocumentType,
   useUploadFile,
 } from '@/hooks/useDocuments'
 import { useAuth } from '@/contexts/AuthContext'
@@ -34,7 +33,6 @@ export function ClientDocumentTab({ clientId }: ClientDocumentTabProps) {
   const uploadFileMutation = useUploadFile()
   const uploadMutation = useUploadClientDocument()
   const deleteMutation = useDeleteClientDocument()
-  const deleteTypeMutation = useDeleteDocumentType()
   const createTypeMutation = useCreateDocumentType()
 
   const [currentApplicantRole, setCurrentApplicantRole] = useState<ApplicantRole>('primary')
@@ -77,38 +75,31 @@ export function ClientDocumentTab({ clientId }: ClientDocumentTabProps) {
   const handleAddCustomDocument = useCallback(async (name: string, file: File, applicantRole?: ApplicantRole) => {
     const role = applicantRole || currentApplicantRole
     try {
+      // Create client-specific custom document type (linked to this client)
       const newType = await createTypeMutation.mutateAsync({
         name,
         level: 'client',
         required: false,
         applicant_type: role === 'co_applicant' ? 'co_applicant' : 'primary',
+        client_id: clientId,  // Link to this specific client
       })
       await handleUpload(newType.id, file, role)
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to add document')
     }
-  }, [currentApplicantRole, createTypeMutation, handleUpload, showError])
+  }, [clientId, currentApplicantRole, createTypeMutation, handleUpload, showError])
 
   const handleDelete = useCallback(async (documentId: string) => {
     if (!window.confirm('Delete this document?')) return
 
     try {
-      const allItems = [...(checklist?.primary || []), ...(checklist?.co_applicant || [])]
-      const item = allItems.find(i => i.document?.id === documentId)
-      const documentTypeId = item?.document_type.id
-      const isCustomType = item?.document_type && !item.document_type.is_system
-
+      // Delete the document - backend automatically deletes custom document type if it was client-specific
       await deleteMutation.mutateAsync({ clientId, documentId })
-
-      if (isCustomType && documentTypeId) {
-        await deleteTypeMutation.mutateAsync(documentTypeId)
-      }
-
       await refetch()
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to delete')
     }
-  }, [clientId, checklist, deleteMutation, deleteTypeMutation, refetch, showError])
+  }, [clientId, deleteMutation, refetch, showError])
 
   const handleView = useCallback((document: ClientDocument | CaseDocument) => {
     setPreviewDoc(prev => prev?.id === document.id ? null : document)
@@ -145,7 +136,7 @@ export function ClientDocumentTab({ clientId }: ClientDocumentTabProps) {
 
       {checklist?.is_joint_application ? (
         <JointApplicationChecklist
-          primaryItems={checklist.primary}
+          primaryItems={[...(checklist.primary || []), ...(checklist.conditional || []), ...(checklist.custom || [])]}
           coApplicantItems={checklist.co_applicant || []}
           onUpload={(docTypeId, file, role) => handleUpload(docTypeId, file, role)}
           onView={handleView}
@@ -159,7 +150,7 @@ export function ClientDocumentTab({ clientId }: ClientDocumentTabProps) {
         />
       ) : (
         <DocumentChecklist
-          items={checklist?.primary || []}
+          items={[...(checklist?.primary || []), ...(checklist?.conditional || []), ...(checklist?.custom || [])]}
           onUpload={handleUpload}
           onView={handleView}
           onDelete={handleDelete}
