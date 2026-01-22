@@ -280,7 +280,7 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
       {/* WhatsApp Tab */}
       {activeTab === 'whatsapp' && lead && (
         <div className="flex-1 overflow-hidden p-6">
-          <LeadWhatsAppTab leadId={leadId!} leadInfo={{ name: lead.name, phone: lead.phone, email: lead.email }} onError={setWhatsAppError} />
+          <LeadWhatsAppTab leadId={leadId!} leadInfo={{ name: lead.name, phone: lead.phone, email: lead.email || undefined }} onError={setWhatsAppError} />
         </div>
       )}
 

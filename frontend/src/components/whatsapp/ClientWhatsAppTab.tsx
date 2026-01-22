@@ -33,7 +33,7 @@ export function ClientWhatsAppTab({ clientId, client, onError }: ClientWhatsAppT
   const clientInfo = client ? {
     name: client.name,
     phone: client.phone,
-    email: client.email,
+    email: client.email || undefined,
   } : undefined
 
   return (

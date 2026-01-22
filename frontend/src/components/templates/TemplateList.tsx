@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Search, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Pagination } from '@/components/Pagination'
 import { TablePageLayout, TableCard, TableContainer, PageLoading, PageError, StatusErrorToast } from '@/components/ui/TablePageLayout'
