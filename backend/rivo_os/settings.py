@@ -188,10 +188,12 @@ CORS_ALLOW_HEADERS = [
 ]
 
 # Session/Cookie settings for cross-origin
-SESSION_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SAMESITE = 'Lax' if DEBUG else 'None'
-CSRF_COOKIE_SECURE = not DEBUG
+# For production (HTTPS), use SameSite=None and Secure=True
+_is_production = os.environ.get('RENDER', '') == 'true' or not DEBUG
+SESSION_COOKIE_SAMESITE = 'None' if _is_production else 'Lax'
+SESSION_COOKIE_SECURE = _is_production
+CSRF_COOKIE_SAMESITE = 'None' if _is_production else 'Lax'
+CSRF_COOKIE_SECURE = _is_production
 
 
 # Supabase configuration
