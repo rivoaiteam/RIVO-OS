@@ -21,16 +21,13 @@ class AuditUserMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Set the user context from the request
-        user = getattr(request, 'user', None)
-        if user and hasattr(user, 'id') and user.id:
-            set_audit_user(user.id)
-        else:
-            clear_audit_user()
+        # Note: For DRF views, the user is set by JWTAuthentication
+        # which calls set_audit_user() after successful authentication.
+        # This middleware just ensures cleanup after the request.
 
         try:
             response = self.get_response(request)
             return response
         finally:
-            # Always clear the context after the request
+            # Always clear the context after the request completes
             clear_audit_user()
