@@ -61,6 +61,16 @@ export interface UpdateNoteData {
   reminder_time?: string | null
 }
 
+// Field Change for detailed display
+export interface FieldChange {
+  field: string
+  field_display: string
+  old_value: unknown
+  new_value: unknown
+  old_display: string
+  new_display: string
+}
+
 // Activity Timeline Types
 
 export interface ActivityTimelineEntry {
@@ -73,6 +83,7 @@ export interface ActivityTimelineEntry {
   entry_type: AuditAction
   record_type: string | null
   record_id: string | null
+  changes: FieldChange[] | null
 }
 
 export interface ActivityTimelineGroup {

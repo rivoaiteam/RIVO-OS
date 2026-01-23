@@ -117,6 +117,16 @@ class NoteUpdateSerializer(serializers.Serializer):
         return attrs
 
 
+class FieldChangeSerializer(serializers.Serializer):
+    """Serializer for individual field change details."""
+    field = serializers.CharField()
+    field_display = serializers.CharField()
+    old_value = serializers.JSONField(allow_null=True)
+    new_value = serializers.JSONField(allow_null=True)
+    old_display = serializers.CharField()
+    new_display = serializers.CharField()
+
+
 class ActivityTimelineEntrySerializer(serializers.Serializer):
     """Serializer for activity timeline entries (human-readable)."""
     id = serializers.UUIDField()
@@ -128,6 +138,7 @@ class ActivityTimelineEntrySerializer(serializers.Serializer):
     entry_type = serializers.CharField()   # Original action type: CREATE, UPDATE, DELETE
     record_type = serializers.CharField(allow_null=True)
     record_id = serializers.UUIDField(allow_null=True)
+    changes = FieldChangeSerializer(many=True, allow_null=True, required=False)
 
     def get_time_display(self, obj):
         """Format time as human-readable (e.g., '2:30 PM')."""

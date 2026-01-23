@@ -44,13 +44,13 @@ logger = logging.getLogger(__name__)
 # Human-readable action templates for activity timeline
 ACTION_TEMPLATES = {
     ('CREATE', 'clients'): '{user} created this client',
-    ('UPDATE', 'clients'): '{user} updated {fields}',
+    ('UPDATE', 'clients'): '{user} {changes_detail}',
     ('DELETE', 'clients'): '{user} deleted this client',
     ('CREATE', 'cases'): '{user} created case',
-    ('UPDATE', 'cases'): '{user} updated {fields}',
+    ('UPDATE', 'cases'): '{user} {changes_detail}',
     ('DELETE', 'cases'): '{user} deleted this case',
     ('CREATE', 'leads'): '{user} created this lead',
-    ('UPDATE', 'leads'): '{user} updated {fields}',
+    ('UPDATE', 'leads'): '{user} {changes_detail}',
     ('DELETE', 'leads'): '{user} deleted this lead',
     ('CREATE', 'notes'): '{user} added a note: "{note_preview}"{reminder_info}',
     ('UPDATE', 'notes'): '{user} edited a note',
@@ -74,13 +74,145 @@ FIELD_DISPLAY_NAMES = {
     'status': 'status',
     'stage': 'stage',
     'monthly_salary': 'monthly salary',
-    'residency': 'residency status',
+    'residency': 'residency',
     'employment_type': 'employment type',
     'property_value': 'property value',
     'loan_amount': 'loan amount',
     'bank': 'bank',
+    'bank_id': 'bank',
     'rate': 'interest rate',
+    'intent': 'intent',
+    'date_of_birth': 'date of birth',
+    'nationality': 'nationality',
+    'application_type': 'application type',
+    'total_addbacks': 'total addbacks',
+    'property_category': 'property category',
+    'property_type': 'property type',
+    'emirate': 'emirate',
+    'transaction_type': 'transaction type',
+    'is_first_property': 'first property status',
+    'tenure_years': 'tenure years',
+    'tenure_months': 'tenure months',
+    'assigned_to': 'assigned to',
+    'assigned_to_id': 'assigned to',
 }
+
+# Status/stage value display mappings
+VALUE_DISPLAY_NAMES = {
+    # Lead/Client status
+    'active': 'Active',
+    'declined': 'Declined',
+    'not_proceeding': 'Not Proceeding',
+    'converted': 'Converted',
+    # Case stages
+    'processing': 'Processing',
+    'document_collection': 'Document Collection',
+    'bank_submission': 'Bank Submission',
+    'bank_processing': 'Bank Processing',
+    'offer_issued': 'Offer Issued',
+    'offer_accepted': 'Offer Accepted',
+    'property_valuation': 'Property Valuation',
+    'final_approval': 'Final Approval',
+    'property_transfer': 'Property Transfer',
+    'property_transferred': 'Property Transferred',
+    'on_hold': 'On Hold',
+    # Residency
+    'uae_national': 'UAE National',
+    'uae_resident': 'UAE Resident',
+    'non_resident': 'Non-Resident',
+    # Employment
+    'salaried': 'Salaried',
+    'self_employed': 'Self Employed',
+    # Application type
+    'single': 'Single',
+    'joint': 'Joint',
+    # Property
+    'residential': 'Residential',
+    'commercial': 'Commercial',
+    'ready': 'Ready',
+    'off_plan': 'Off-Plan',
+    # Transaction type
+    'primary_purchase': 'Primary Purchase',
+    'resale': 'Resale',
+    'buyout_equity': 'Buyout + Equity',
+    'buyout': 'Buyout',
+    'equity': 'Equity',
+    # Emirates
+    'dubai': 'Dubai',
+    'abu_dhabi': 'Abu Dhabi',
+    'sharjah': 'Sharjah',
+    'ajman': 'Ajman',
+    'ras_al_khaimah': 'Ras Al Khaimah',
+    'fujairah': 'Fujairah',
+    'umm_al_quwain': 'Umm Al Quwain',
+    # Boolean
+    True: 'Yes',
+    False: 'No',
+    'true': 'Yes',
+    'false': 'No',
+}
+
+# Fields that should be formatted as currency (AED)
+CURRENCY_FIELDS = {'monthly_salary', 'property_value', 'loan_amount', 'total_addbacks'}
+
+
+def format_value(field_name, value):
+    """Format a value for human-readable display."""
+    if value is None or value == '':
+        return 'empty'
+
+    # Check if it's a known value with display name
+    if value in VALUE_DISPLAY_NAMES:
+        return VALUE_DISPLAY_NAMES[value]
+
+    # Format currency fields
+    if field_name in CURRENCY_FIELDS:
+        try:
+            num_value = float(value)
+            return f"AED {num_value:,.0f}"
+        except (ValueError, TypeError):
+            return str(value)
+
+    # Format boolean
+    if isinstance(value, bool):
+        return 'Yes' if value else 'No'
+
+    return str(value)
+
+
+def format_changes_for_display(changes):
+    """
+    Format changes dict for structured frontend display.
+    Returns list of {field, field_display, old_value, new_value, old_display, new_display}
+    """
+    if not changes:
+        return []
+
+    skip_fields = {'updated_at', 'created_at', 'id', 'uuid'}
+    result = []
+
+    for field_name, change_data in changes.items():
+        if field_name in skip_fields:
+            continue
+
+        if isinstance(change_data, dict) and 'old' in change_data and 'new' in change_data:
+            old_val = change_data.get('old')
+            new_val = change_data.get('new')
+
+            # Skip if values are the same
+            if old_val == new_val:
+                continue
+
+            result.append({
+                'field': field_name,
+                'field_display': FIELD_DISPLAY_NAMES.get(field_name, field_name.replace('_', ' ')),
+                'old_value': old_val,
+                'new_value': new_val,
+                'old_display': format_value(field_name, old_val),
+                'new_display': format_value(field_name, new_val),
+            })
+
+    return result
 
 
 def get_user_name(user_id):
@@ -95,23 +227,49 @@ def get_user_name(user_id):
 
 
 def format_changed_fields(changes):
-    """Format changed fields into human-readable string."""
+    """Format changed fields into human-readable string with old/new values."""
     if not changes:
-        return 'details'
+        return 'updated details'
 
-    fields = []
-    for field_name in changes.keys():
+    # Filter out internal fields we don't want to show
+    skip_fields = {'updated_at', 'created_at', 'id', 'uuid'}
+    filtered_changes = {k: v for k, v in changes.items() if k not in skip_fields}
+
+    if not filtered_changes:
+        return 'updated details'
+
+    change_descriptions = []
+    for field_name, change_data in filtered_changes.items():
         display_name = FIELD_DISPLAY_NAMES.get(field_name, field_name.replace('_', ' '))
-        fields.append(display_name)
 
-    if len(fields) == 0:
-        return 'details'
-    elif len(fields) == 1:
-        return fields[0]
-    elif len(fields) == 2:
-        return f"{fields[0]} and {fields[1]}"
+        # Handle different change data formats
+        if isinstance(change_data, dict) and 'old' in change_data and 'new' in change_data:
+            old_val = format_value(field_name, change_data.get('old'))
+            new_val = format_value(field_name, change_data.get('new'))
+
+            # Skip if values are the same after formatting
+            if old_val == new_val:
+                continue
+
+            if old_val == 'empty':
+                change_descriptions.append(f"set {display_name} to {new_val}")
+            elif new_val == 'empty':
+                change_descriptions.append(f"cleared {display_name}")
+            else:
+                change_descriptions.append(f"changed {display_name} from {old_val} to {new_val}")
+        else:
+            # For CREATE actions where we just have the value
+            val = format_value(field_name, change_data)
+            change_descriptions.append(f"set {display_name} to {val}")
+
+    if len(change_descriptions) == 0:
+        return 'updated details'
+    elif len(change_descriptions) == 1:
+        return change_descriptions[0]
+    elif len(change_descriptions) == 2:
+        return f"{change_descriptions[0]} and {change_descriptions[1]}"
     else:
-        return f"{', '.join(fields[:-1])}, and {fields[-1]}"
+        return f"{', '.join(change_descriptions[:-1])}, and {change_descriptions[-1]}"
 
 
 def format_action_summary(audit_entry):
@@ -124,8 +282,8 @@ def format_action_summary(audit_entry):
     template_key = (action, table)
     template = ACTION_TEMPLATES.get(template_key, '{user} performed an action')
 
-    # Format fields for UPDATE actions
-    fields = format_changed_fields(changes) if action == 'UPDATE' else ''
+    # Format detailed changes for UPDATE actions
+    changes_detail = format_changed_fields(changes) if action == 'UPDATE' else ''
 
     # Format document name for document tables
     document = ''
@@ -145,7 +303,6 @@ def format_action_summary(audit_entry):
             # Truncate to 50 chars
             note_preview = note_text[:50] + ('...' if len(note_text) > 50 else '')
         # Check if there's a reminder associated with this note
-        # Note: We can check if reminder exists by looking at the Note
         try:
             note = Note.objects.get(pk=audit_entry.record_id)
             if hasattr(note, 'reminder') and note.reminder:
@@ -153,7 +310,13 @@ def format_action_summary(audit_entry):
         except Note.DoesNotExist:
             pass
 
-    return template.format(user=user_name, fields=fields, document=document, note_preview=note_preview, reminder_info=reminder_info)
+    return template.format(
+        user=user_name,
+        changes_detail=changes_detail,
+        document=document,
+        note_preview=note_preview,
+        reminder_info=reminder_info
+    )
 
 
 def get_action_type(table_name):
@@ -292,6 +455,7 @@ class ActivityTimelineView(APIView):
                 'entry_type': entry.action,
                 'record_type': entry.table_name,
                 'record_id': entry.record_id,
+                'changes': format_changes_for_display(entry.changes) if entry.action == 'UPDATE' else None,
             }
             grouped[date].append(formatted_entry)
 
