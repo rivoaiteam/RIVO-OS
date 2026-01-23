@@ -867,7 +867,8 @@ class DashboardRemindersView(APIView):
             'note__lead',
         ).order_by('reminder_date', 'reminder_time')
 
-        # Optionally filter by user's notes
+        # Filter by current user's reminders only
+        # Each user sees only reminders they created
         if user:
             queryset = queryset.filter(note__author=user)
 
