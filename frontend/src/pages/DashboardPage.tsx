@@ -1,9 +1,23 @@
+import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { WhatsNextSection } from '@/components/activity'
+import { ClientSidePanel } from '@/components/ClientSidePanel'
+import { CaseSidePanel } from '@/components/CaseSidePanel'
+import { LeadSidePanel } from '@/components/LeadSidePanel'
 
 export function DashboardPage() {
+  const [selectedClient, setSelectedClient] = useState<string | null>(null)
+  const [selectedCase, setSelectedCase] = useState<string | null>(null)
+  const [selectedLead, setSelectedLead] = useState<string | null>(null)
+
   const handleNavigate = (type: 'client' | 'case' | 'lead', id: string) => {
-    console.log(`Navigate to ${type}s/${id}`)
+    if (type === 'client') {
+      setSelectedClient(id)
+    } else if (type === 'case') {
+      setSelectedCase(id)
+    } else if (type === 'lead') {
+      setSelectedLead(id)
+    }
   }
 
   return (
@@ -73,6 +87,23 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Side Panels */}
+      {selectedClient && (
+        <ClientSidePanel
+          clientId={selectedClient}
+          onClose={() => setSelectedClient(null)}
+        />
+      )}
+      <CaseSidePanel
+        caseId={selectedCase}
+        isOpen={!!selectedCase}
+        onClose={() => setSelectedCase(null)}
+      />
+      <LeadSidePanel
+        leadId={selectedLead}
+        onClose={() => setSelectedLead(null)}
+      />
     </div>
   )
 }
