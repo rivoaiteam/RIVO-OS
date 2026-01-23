@@ -12,6 +12,7 @@ from rest_framework import authentication
 from rest_framework.exceptions import AuthenticationFailed
 
 from users.models import User
+from audit.models import set_audit_user
 
 
 def get_supabase_client():
@@ -89,6 +90,9 @@ class JWTAuthentication(authentication.BaseAuthentication):
             user = User.objects.get(id=payload['user_id'], is_active=True)
         except User.DoesNotExist:
             raise AuthenticationFailed('User not found.')
+
+        # Set the audit user context for tracking who made changes
+        set_audit_user(user.id)
 
         return (user, payload)
 

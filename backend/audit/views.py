@@ -42,15 +42,16 @@ logger = logging.getLogger(__name__)
 
 
 # Human-readable action templates for activity timeline
+# Keep activity simple and readable per spec
 ACTION_TEMPLATES = {
     ('CREATE', 'clients'): '{user} created this client',
-    ('UPDATE', 'clients'): '{user} {changes_detail}',
+    ('UPDATE', 'clients'): '{user} updated {fields}',
     ('DELETE', 'clients'): '{user} deleted this client',
     ('CREATE', 'cases'): '{user} created case',
-    ('UPDATE', 'cases'): '{user} {changes_detail}',
+    ('UPDATE', 'cases'): '{user} updated {fields}',
     ('DELETE', 'cases'): '{user} deleted this case',
     ('CREATE', 'leads'): '{user} created this lead',
-    ('UPDATE', 'leads'): '{user} {changes_detail}',
+    ('UPDATE', 'leads'): '{user} updated {fields}',
     ('DELETE', 'leads'): '{user} deleted this lead',
     ('CREATE', 'notes'): '{user} added a note: "{note_preview}"{reminder_info}',
     ('UPDATE', 'notes'): '{user} edited a note',
@@ -155,6 +156,17 @@ VALUE_DISPLAY_NAMES = {
 # Fields that should be formatted as currency (AED)
 CURRENCY_FIELDS = {'monthly_salary', 'property_value', 'loan_amount', 'total_addbacks'}
 
+# Fields to SHOW in activity timeline (key milestones only)
+# Activity shows important events, not every field update
+# Full audit log has everything for compliance
+ACTIVITY_VISIBLE_FIELDS = {
+    # Status & Workflow (key milestones)
+    'status',  # Lead: active → declined, Client: active → converted
+    'stage',   # Case progress: Processing → Bank Submission → etc.
+    # Assignment changes
+    'assigned_to', 'assigned_to_id',
+}
+
 
 def format_value(field_name, value):
     """Format a value for human-readable display."""
@@ -226,50 +238,37 @@ def get_user_name(user_id):
         return 'Unknown'
 
 
-def format_changed_fields(changes):
-    """Format changed fields into human-readable string with old/new values."""
+def format_changed_fields_simple(changes):
+    """Format changed fields into simple human-readable string (field names only).
+
+    Only includes meaningful fields defined in ACTIVITY_VISIBLE_FIELDS.
+    """
     if not changes:
-        return 'updated details'
+        return 'details'
 
-    # Filter out internal fields we don't want to show
-    skip_fields = {'updated_at', 'created_at', 'id', 'uuid'}
-    filtered_changes = {k: v for k, v in changes.items() if k not in skip_fields}
+    # Just collect field display names for visible fields only
+    fields = []
+    for field_name, change_data in changes.items():
+        # Only show fields that matter for activity
+        if field_name not in ACTIVITY_VISIBLE_FIELDS:
+            continue
 
-    if not filtered_changes:
-        return 'updated details'
-
-    change_descriptions = []
-    for field_name, change_data in filtered_changes.items():
-        display_name = FIELD_DISPLAY_NAMES.get(field_name, field_name.replace('_', ' '))
-
-        # Handle different change data formats
+        # Skip if values are the same
         if isinstance(change_data, dict) and 'old' in change_data and 'new' in change_data:
-            old_val = format_value(field_name, change_data.get('old'))
-            new_val = format_value(field_name, change_data.get('new'))
-
-            # Skip if values are the same after formatting
-            if old_val == new_val:
+            if change_data.get('old') == change_data.get('new'):
                 continue
 
-            if old_val == 'empty':
-                change_descriptions.append(f"set {display_name} to {new_val}")
-            elif new_val == 'empty':
-                change_descriptions.append(f"cleared {display_name}")
-            else:
-                change_descriptions.append(f"changed {display_name} from {old_val} to {new_val}")
-        else:
-            # For CREATE actions where we just have the value
-            val = format_value(field_name, change_data)
-            change_descriptions.append(f"set {display_name} to {val}")
+        display_name = FIELD_DISPLAY_NAMES.get(field_name, field_name.replace('_', ' '))
+        fields.append(display_name)
 
-    if len(change_descriptions) == 0:
-        return 'updated details'
-    elif len(change_descriptions) == 1:
-        return change_descriptions[0]
-    elif len(change_descriptions) == 2:
-        return f"{change_descriptions[0]} and {change_descriptions[1]}"
+    if len(fields) == 0:
+        return 'details'
+    elif len(fields) == 1:
+        return fields[0]
+    elif len(fields) == 2:
+        return f"{fields[0]} and {fields[1]}"
     else:
-        return f"{', '.join(change_descriptions[:-1])}, and {change_descriptions[-1]}"
+        return f"{', '.join(fields[:-1])}, and {fields[-1]}"
 
 
 def format_action_summary(audit_entry):
@@ -282,8 +281,8 @@ def format_action_summary(audit_entry):
     template_key = (action, table)
     template = ACTION_TEMPLATES.get(template_key, '{user} performed an action')
 
-    # Format detailed changes for UPDATE actions
-    changes_detail = format_changed_fields(changes) if action == 'UPDATE' else ''
+    # Format simple field list for UPDATE actions (no old/new values)
+    fields = format_changed_fields_simple(changes) if action == 'UPDATE' else ''
 
     # Format document name for document tables
     document = ''
@@ -312,7 +311,7 @@ def format_action_summary(audit_entry):
 
     return template.format(
         user=user_name,
-        changes_detail=changes_detail,
+        fields=fields,
         document=document,
         note_preview=note_preview,
         reminder_info=reminder_info
@@ -445,6 +444,15 @@ class ActivityTimelineView(APIView):
         # Group entries by date
         grouped = defaultdict(list)
         for entry in audit_entries:
+            # Skip UPDATE entries with no visible field changes
+            if entry.action == 'UPDATE' and entry.table_name in ('clients', 'cases', 'leads'):
+                visible_changes = [
+                    k for k in (entry.changes or {}).keys()
+                    if k in ACTIVITY_VISIBLE_FIELDS
+                ]
+                if not visible_changes:
+                    continue
+
             date = entry.timestamp.date()
             formatted_entry = {
                 'id': entry.id,
