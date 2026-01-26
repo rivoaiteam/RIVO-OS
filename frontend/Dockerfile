@@ -12,10 +12,11 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the app (API URL will be injected at build time)
-ARG VITE_API_URL
+# Build argument for API URL (set in Cloud Build)
+ARG VITE_API_URL=https://rivo-backend-test-331738587654.asia-southeast1.run.app/api
 ENV VITE_API_URL=$VITE_API_URL
 
+# Build the app
 RUN npm run build
 
 # Production stage - serve with nginx
