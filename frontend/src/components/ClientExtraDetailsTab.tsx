@@ -24,8 +24,8 @@ const MARITAL_STATUS_OPTIONS: { value: MaritalStatus; label: string }[] = [
 ]
 
 export function ClientExtraDetailsTab({ clientId, employmentType, viewOnly: viewOnlyProp }: ClientExtraDetailsTabProps) {
-  const { user } = useAuth()
-  const isReadOnly = viewOnlyProp || user?.role === 'manager'
+  const { can } = useAuth()
+  const isReadOnly = viewOnlyProp || !can('update', 'clients')
   const { data: extraDetails, isLoading, error, refetch } = useClientExtraDetails(clientId)
   const updateMutation = useUpdateClientExtraDetails()
 

@@ -33,7 +33,7 @@ from leads.serializers import (
     LeadInteractionSerializer,
     LeadMessageSerializer,
 )
-from users.permissions import IsAuthenticated
+from users.permissions import IsAuthenticated, CanAccessLeads
 from whatsapp.services import ycloud_service, YCloudError
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ class LeadViewSet(viewsets.ModelViewSet):
     queryset = Lead.objects.select_related(
         'sub_source__source__channel'
     ).filter(converted_client_id__isnull=True).order_by('-created_at')
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessLeads]
     pagination_class = LeadPagination
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 

@@ -27,8 +27,8 @@ interface ClientDocumentTabProps {
 }
 
 export function ClientDocumentTab({ clientId }: ClientDocumentTabProps) {
-  const { user } = useAuth()
-  const isReadOnly = user?.role === 'manager'
+  const { can } = useAuth()
+  const isReadOnly = !can('update', 'clients')
   const { data: checklist, isLoading, error, refetch } = useClientDocuments(clientId)
   const uploadFileMutation = useUploadFile()
   const uploadMutation = useUploadClientDocument()

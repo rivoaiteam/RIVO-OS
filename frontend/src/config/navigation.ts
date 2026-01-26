@@ -95,6 +95,10 @@ const processExecutiveToolbox: NavItem[] = [
   { id: 'templates-toolbox', label: 'Templates', href: '/templates', icon: FileText, roles: ['process_executive'], section: 'toolbox' },
 ]
 
+const processExecutivePayouts: NavItem[] = [
+  { id: 'my-commissions', label: 'My Commissions', href: '/payouts/commissions', icon: Coins, roles: ['process_executive'], section: 'payouts' },
+]
+
 export function getNavigationSections(role: UserRole): NavSection[] {
   const sections: NavSection[] = []
 
@@ -148,6 +152,11 @@ export function getNavigationSections(role: UserRole): NavSection[] {
         id: 'toolbox',
         label: 'TOOLBOX',
         items: processExecutiveToolbox,
+      })
+      sections.push({
+        id: 'payouts',
+        label: 'PAYOUTS',
+        items: processExecutivePayouts,
       })
       break
   }

@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from users.permissions import IsAuthenticated, IsAdminRole
+from users.iam import can, Action, Resource
 from .models import MessageTemplate, TemplateCategory
 from .serializers import (
     MessageTemplateSerializer,
@@ -45,10 +46,9 @@ class MessageTemplateViewSet(viewsets.ModelViewSet):
         """Filter templates by search and category."""
         queryset = MessageTemplate.objects.all()
 
-        # Filter by active status (default to active only for non-admin)
+        # Filter by active status (admin can see inactive templates)
         user = self.request.user
-        is_admin = hasattr(user, 'role') and user.role == 'admin'
-        if not is_admin:
+        if not can(user, Action.DELETE, Resource.TEMPLATES):
             queryset = queryset.filter(is_active=True)
 
         # Filter by category

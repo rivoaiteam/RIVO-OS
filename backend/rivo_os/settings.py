@@ -100,7 +100,11 @@ WSGI_APPLICATION = 'rivo_os.wsgi.application'
 import dj_database_url
 
 DATABASES = {
-    'default': dj_database_url.parse(os.environ.get('SUPABASE_DB_URL'))
+    'default': dj_database_url.parse(
+        os.environ.get('SUPABASE_DB_URL'),
+        conn_max_age=600,  # Keep connections alive for 10 minutes
+        conn_health_checks=True,  # Verify connection before reuse
+    )
 }
 
 

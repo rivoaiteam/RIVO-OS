@@ -1,16 +1,28 @@
 import { useState } from 'react'
-import { PageHeader } from '@/components/layout/PageHeader'
-import { WhatsNextSection } from '@/components/activity'
+import { Check, Loader2 } from 'lucide-react'
+import { useDashboardReminders, useCompleteReminder } from '@/hooks/useAudit'
 import { ClientSidePanel } from '@/components/ClientSidePanel'
 import { CaseSidePanel } from '@/components/CaseSidePanel'
 import { LeadSidePanel } from '@/components/LeadSidePanel'
+import {
+  TablePageLayout,
+  TableCard,
+  TableContainer,
+  PageHeader,
+  PageLoading,
+} from '@/components/ui/TablePageLayout'
+import { cn } from '@/lib/utils'
+import type { NotableType } from '@/types/audit'
 
 export function DashboardPage() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null)
   const [selectedCase, setSelectedCase] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<string | null>(null)
 
-  const handleNavigate = (type: 'client' | 'case' | 'lead', id: string) => {
+  const { data: reminders, isLoading } = useDashboardReminders()
+  const completeMutation = useCompleteReminder()
+
+  const handleNavigate = (type: NotableType, id: string) => {
     if (type === 'client') {
       setSelectedClient(id)
     } else if (type === 'case') {
@@ -20,73 +32,95 @@ export function DashboardPage() {
     }
   }
 
+  const handleComplete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    completeMutation.mutate(id)
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const today = new Date()
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today'
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  const formatTime = (timeStr: string | null) => {
+    if (!timeStr) return ''
+    const [hours, minutes] = timeStr.split(':')
+    const hour = parseInt(hours, 10)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const hour12 = hour % 12 || 12
+    return ` at ${hour12}:${minutes} ${ampm}`
+  }
+
+  if (isLoading) {
+    return <PageLoading />
+  }
+
   return (
-    <div>
-      <PageHeader
-        title="Dashboard"
-        subtitle="Welcome back to Rivo OS"
-      />
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Stats Cards */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="text-sm text-gray-500 mb-1">Active Leads</div>
-            <div className="text-3xl font-bold text-gray-900">124</div>
-            <div className="text-sm text-green-600 mt-2">+12% from last month</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="text-sm text-gray-500 mb-1">Open Cases</div>
-            <div className="text-3xl font-bold text-gray-900">67</div>
-            <div className="text-sm text-blue-600 mt-2">23 pending approval</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="text-sm text-gray-500 mb-1">This Month's Disbursement</div>
-            <div className="text-3xl font-bold text-gray-900">AED 12.4M</div>
-            <div className="text-sm text-green-600 mt-2">+8% from last month</div>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-            <div className="text-sm text-gray-500 mb-1">Conversion Rate</div>
-            <div className="text-3xl font-bold text-gray-900">34.2%</div>
-            <div className="text-sm text-orange-600 mt-2">-2% from last month</div>
-          </div>
-        </div>
-
-        {/* What's Next and Recent Activity */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* What's Next Section */}
-          <WhatsNextSection onNavigate={handleNavigate} />
-
-          {/* Recent Activity */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="p-6 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {[
-                { action: 'New lead added', client: 'Mohammed Hassan', time: '5 min ago', type: 'create' },
-                { action: 'Case approved', client: 'Priya Sharma', time: '12 min ago', type: 'success' },
-                { action: 'Document uploaded', client: 'James Thompson', time: '25 min ago', type: 'update' },
-                { action: 'Lead qualified', client: 'Fatima Al Hashimi', time: '1 hour ago', type: 'success' },
-                { action: 'New lead assigned', client: 'Raj Patel', time: '2 hours ago', type: 'create' },
-              ].map((item, i) => (
-                <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-2 h-2 rounded-full ${
-                      item.type === 'success' ? 'bg-green-500' :
-                      item.type === 'create' ? 'bg-blue-500' : 'bg-orange-500'
-                    }`} />
-                    <div>
-                      <p className="text-sm text-gray-900">{item.action}</p>
-                      <p className="text-xs text-gray-500">{item.client}</p>
-                    </div>
-                  </div>
-                  <span className="text-xs text-gray-400">{item.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+    <TablePageLayout>
+      <div className="px-6 py-4">
+        <PageHeader
+          title="Reminders"
+          subtitle="Your pending follow-ups"
+          hideAction
+        />
       </div>
+
+      <TableCard>
+        <TableContainer isEmpty={!reminders?.length} emptyMessage="No reminders">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="w-[35%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Client</th>
+                <th className="w-[40%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Note</th>
+                <th className="w-[20%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Due</th>
+                <th className="w-[5%] text-left pb-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {reminders?.map((reminder) => (
+                <tr
+                  key={reminder.id}
+                  onClick={() => handleNavigate(reminder.notable_type, reminder.notable_id)}
+                  className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                >
+                  <td className="py-3">
+                    <span className="text-xs font-medium text-gray-900">{reminder.notable_name}</span>
+                  </td>
+                  <td className="py-3">
+                    <span className="text-xs text-gray-600 truncate block">{reminder.note_text}</span>
+                  </td>
+                  <td className="py-3">
+                    <span className={cn(
+                      'text-xs',
+                      reminder.is_overdue ? 'text-red-600' : 'text-gray-500'
+                    )}>
+                      {formatDate(reminder.reminder_date)}{formatTime(reminder.reminder_time)}
+                      {reminder.is_overdue && ' • Overdue'}
+                    </span>
+                  </td>
+                  <td className="py-3">
+                    <button
+                      onClick={(e) => handleComplete(reminder.id, e)}
+                      disabled={completeMutation.isPending && completeMutation.variables === reminder.id}
+                      className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                    >
+                      {completeMutation.isPending && completeMutation.variables === reminder.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableContainer>
+      </TableCard>
 
       {/* Side Panels */}
       {selectedClient && (
@@ -104,6 +138,6 @@ export function DashboardPage() {
         leadId={selectedLead}
         onClose={() => setSelectedLead(null)}
       />
-    </div>
+    </TablePageLayout>
   )
 }

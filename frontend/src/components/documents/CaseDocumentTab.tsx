@@ -26,8 +26,8 @@ interface CaseDocumentTabProps {
 }
 
 export function CaseDocumentTab({ caseId }: CaseDocumentTabProps) {
-  const { user } = useAuth()
-  const isReadOnly = user?.role === 'manager'
+  const { can } = useAuth()
+  const isReadOnly = !can('update', 'cases')
   const { data: checklist, isLoading, error, refetch } = useCaseDocuments(caseId)
   const uploadFileMutation = useUploadFile()
   const uploadMutation = useUploadCaseDocument()

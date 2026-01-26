@@ -32,7 +32,7 @@ from cases.serializers import (
     SLABreachItemSerializer,
 )
 from clients.models import Client, ClientStatus
-from users.permissions import IsAuthenticated, IsManager
+from users.permissions import IsAuthenticated, IsManager, CanAccessCases
 from users.models import User
 from audit.models import Note, AuditLog
 
@@ -71,7 +71,7 @@ class CaseViewSet(viewsets.ModelViewSet):
     """
 
     queryset = Case.objects.all().select_related('client', 'assigned_to').order_by('-created_at')
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessCases]
     pagination_class = CasePagination
 
     # Disable delete action

@@ -25,7 +25,7 @@ from clients.serializers import (
     ClientExtraDetailsSerializer,
     ClientExtraDetailsCreateUpdateSerializer,
 )
-from users.permissions import IsAuthenticated
+from users.permissions import IsAuthenticated, CanAccessClients
 from users.models import User
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         'converted_from_lead',
         'assigned_to',
     ).prefetch_related('co_applicant').order_by('-created_at')
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanAccessClients]
     pagination_class = ClientPagination
 
     # Disable destroy action - no delete per spec

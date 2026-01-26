@@ -28,13 +28,13 @@ interface LeadSidePanelProps {
 }
 
 export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
-  const { user } = useAuth()
+  const { can } = useAuth()
   const { data: lead, isLoading, error } = useLead(leadId || '')
   const updateMutation = useUpdateLead()
   const convertMutation = useConvertLeadToClient()
   const changeStatusMutation = useChangeLeadStatus()
 
-  const isReadOnly = user?.role === 'manager'
+  const isReadOnly = !can('update', 'leads')
   const [activeTab, setActiveTab] = useState<TabType>('details')
 
   // Local form state
@@ -102,8 +102,8 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
 
   const getSourceDisplay = () => {
     if (!lead?.sub_source) return '-'
-    const parts = [lead.sub_source.channel_name, lead.sub_source.source_name, lead.sub_source.name].filter(Boolean)
-    return parts.length > 0 ? parts.join(' / ') : '-'
+    const { name, source_name } = lead.sub_source
+    return name && source_name ? `${name} (${source_name})` : name || source_name || '-'
   }
 
   if (!leadId) return null
@@ -126,11 +126,15 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
                 <span className="px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
                   Declined
                 </span>
+              ) : isReadOnly ? (
+                <span className={cn('px-2 py-0.5 text-xs font-medium rounded', statusColors[status])}>
+                  {status === 'active' ? 'Active' : 'Declined'}
+                </span>
               ) : (
                 <select
                   value={status}
                   onChange={(e) => handleStatusChange(e.target.value as LeadStatus)}
-                  disabled={changeStatusMutation.isPending || isReadOnly}
+                  disabled={changeStatusMutation.isPending}
                   className={cn(
                     'px-2 py-0.5 text-xs font-medium rounded border-0 focus:outline-none cursor-pointer disabled:opacity-50',
                     statusColors[status]
@@ -285,39 +289,43 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
       )}
 
       {/* Footer */}
-      {!isReadOnly && activeTab === 'details' && lead && lead.status === 'active' && !lead.converted_client && (
+      {activeTab === 'details' && lead && lead.status === 'active' && !lead.converted_client && (
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 space-y-2">
-          <button
-            onClick={handleSave}
-            disabled={updateMutation.isPending}
-            className="w-full py-2.5 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2d4a6f] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {updateMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              'Save Changes'
-            )}
-          </button>
-          <button
-            onClick={handleConvert}
-            disabled={convertMutation.isPending}
-            className="w-full py-2.5 border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {convertMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Converting...
-              </>
-            ) : (
-              <>
-                <UserPlus className="h-4 w-4" />
-                Convert to Client
-              </>
-            )}
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+              className="w-full py-2.5 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#2d4a6f] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+          )}
+          {can('create', 'clients') && (
+            <button
+              onClick={handleConvert}
+              disabled={convertMutation.isPending}
+              className="w-full py-2.5 border border-[#1e3a5f] text-[#1e3a5f] rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {convertMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Converting...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4" />
+                  Convert to Client
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
     </SidePanelWrapper>

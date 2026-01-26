@@ -140,12 +140,12 @@ const NATIONALITY_OPTIONS = [
 ]
 
 export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: viewOnlyProp }: ClientSidePanelProps) {
-  const { user } = useAuth()
+  const { can } = useAuth()
   const isCreateMode = clientId === 'new'
   const { data: client, isLoading, error } = useClient(clientId)
 
-  // Managers have read-only access
-  const viewOnly = viewOnlyProp || user?.role === 'manager'
+  // Check permissions from IAM
+  const viewOnly = viewOnlyProp || !can('update', 'clients')
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('details')

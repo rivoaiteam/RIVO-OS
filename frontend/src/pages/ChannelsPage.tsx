@@ -250,10 +250,12 @@ function ChannelRowWithNested({
               onError={onError}
             />
           ) : (
-            <tr className="bg-gray-50/50 border-b border-gray-100">
-              <td className="py-2"></td>
+            <tr className="bg-slate-50/50 border-b border-gray-100">
+              <td className="py-2 pl-4">
+                <span className="text-gray-300">└</span>
+              </td>
               <td className="py-2" colSpan={3}>
-                <button onClick={() => setShowAddSource(true)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 pl-2">
+                <button onClick={() => setShowAddSource(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
                   <Plus className="h-3.5 w-3.5" />
                   Add Source
                 </button>
@@ -300,8 +302,10 @@ function InlineAddSourceRow({
   }
 
   return (
-    <tr className="bg-blue-50/30 border-b border-gray-100">
-      <td className="py-2"></td>
+    <tr className="bg-slate-50/70 border-b border-gray-100">
+      <td className="py-2 pl-4">
+        <span className="text-gray-300">└</span>
+      </td>
       <td className="py-2">
         <input
           type="text"
@@ -310,7 +314,7 @@ function InlineAddSourceRow({
           placeholder="Source name"
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-          className="w-full h-7 px-2 text-xs border border-gray-200 rounded focus:outline-none bg-white ml-2"
+          className="w-full h-7 px-2 text-xs border border-gray-200 rounded focus:outline-none bg-white"
         />
       </td>
       <td className="py-2"></td>
@@ -354,14 +358,17 @@ function SourceRowWithNested({
   return (
     <>
       {/* Source Row */}
-      <tr className="bg-blue-50/30 border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
-        <td className="py-2">
-          <button onClick={() => setExpanded(!expanded)} className="p-1 text-gray-400 hover:text-gray-600">
-            {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRightIcon className="h-3.5 w-3.5" />}
-          </button>
+      <tr className="bg-slate-50/70 border-b border-gray-100 hover:bg-slate-100/80 transition-colors">
+        <td className="py-2 pl-4">
+          <div className="flex items-center gap-1">
+            <span className="text-gray-300">└</span>
+            <button onClick={() => setExpanded(!expanded)} className="p-1 text-gray-400 hover:text-gray-600">
+              {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRightIcon className="h-3.5 w-3.5" />}
+            </button>
+          </div>
         </td>
         <td className="py-2 cursor-pointer" onClick={() => onEditSource(source)}>
-          <span className="text-xs font-medium text-gray-800 pl-2 hover:text-[#1e3a5f]">{source.name}</span>
+          <span className="text-xs font-medium text-gray-700 hover:text-[#1e3a5f]">{source.name}</span>
         </td>
         <td className="py-2">
           <span className="text-xs text-gray-500">
@@ -388,10 +395,12 @@ function SourceRowWithNested({
               onError={onError}
             />
           ) : (
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <td className="py-2"></td>
+            <tr className="bg-slate-100/40 border-b border-gray-100">
+              <td className="py-2 pl-8">
+                <span className="text-gray-300">└</span>
+              </td>
               <td className="py-2" colSpan={3}>
-                <button onClick={() => setShowAddSubSource(true)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 pl-4">
+                <button onClick={() => setShowAddSubSource(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
                   <Plus className="h-3.5 w-3.5" />
                   Add Sub-source
                 </button>
@@ -435,8 +444,10 @@ function InlineAddSubSourceRow({
   }
 
   return (
-    <tr className="bg-gray-50 border-b border-gray-100">
-      <td className="py-2"></td>
+    <tr className="bg-slate-100/60 border-b border-gray-100">
+      <td className="py-2 pl-8">
+        <span className="text-gray-300">└</span>
+      </td>
       <td className="py-2">
         <input
           type="text"
@@ -445,7 +456,7 @@ function InlineAddSubSourceRow({
           placeholder="Sub-source name"
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-          className="w-full h-7 px-2 text-xs border border-gray-200 rounded focus:outline-none bg-white ml-4"
+          className="w-full h-7 px-2 text-xs border border-gray-200 rounded focus:outline-none bg-white"
         />
       </td>
       <td className="py-2"></td>
@@ -483,10 +494,12 @@ function SubSourceRow({
   }
 
   return (
-    <tr className="bg-gray-50 border-b border-gray-100 hover:bg-gray-100/50 transition-colors">
-      <td className="py-2"></td>
+    <tr className="bg-slate-100/60 border-b border-gray-100 hover:bg-slate-100 transition-colors">
+      <td className="py-2 pl-8">
+        <span className="text-gray-300">└</span>
+      </td>
       <td className="py-2 cursor-pointer" onClick={onEdit}>
-        <span className="text-xs font-medium text-gray-700 pl-4 hover:text-[#1e3a5f]">{subSource.name}</span>
+        <span className="text-xs font-medium text-gray-600 hover:text-[#1e3a5f]">{subSource.name}</span>
       </td>
       <td className="py-2">
         <span className="text-xs text-gray-500">

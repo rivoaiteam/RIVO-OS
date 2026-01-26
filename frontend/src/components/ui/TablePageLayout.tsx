@@ -71,7 +71,7 @@ interface TablePageLayoutProps {
  */
 export function TablePageLayout({ children }: TablePageLayoutProps) {
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {children}
     </div>
   )
@@ -88,8 +88,8 @@ interface TableCardProps {
  */
 export function TableCard({ children, className = '' }: TableCardProps) {
   return (
-    <div className={`mx-6 mb-6 flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden ${className}`}>
-      <div className="px-4 pt-4 flex-1 flex flex-col">
+    <div className={`mx-6 mb-6 flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden ${className}`}>
+      <div className="px-4 pt-4 flex-1 flex flex-col min-h-0 overflow-hidden">
         {children}
       </div>
     </div>
@@ -108,7 +108,7 @@ interface TableContainerProps {
  */
 export function TableContainer({ children, isEmpty = false, emptyMessage = 'No items found' }: TableContainerProps) {
   return (
-    <div className="flex-1">
+    <div className="flex-1 overflow-y-auto min-h-0">
       {children}
       {isEmpty && (
         <div className="flex-1 flex items-center justify-center py-16">

@@ -847,17 +847,12 @@ class DashboardRemindersView(APIView):
         Get pending reminders for current user's dashboard.
 
         GET /api/dashboard/reminders/
-        Returns reminders that are due today or overdue.
+        Returns all pending reminders for the current user.
         """
-        today = timezone.now().date()
-
-        # Get reminders that are pending and due today or overdue
-        # Filter by notes authored by current user
         user = request.user if hasattr(request, 'user') else None
 
         queryset = Reminder.objects.filter(
             status=ReminderStatus.PENDING,
-            reminder_date__lte=today,
         ).select_related(
             'note',
             'note__author',
@@ -868,7 +863,6 @@ class DashboardRemindersView(APIView):
         ).order_by('reminder_date', 'reminder_time')
 
         # Filter by current user's reminders only
-        # Each user sees only reminders they created
         if user:
             queryset = queryset.filter(note__author=user)
 

@@ -135,8 +135,9 @@ function BankFilterDropdown({ value, onChange, banks }: {
 }
 
 export function CasesPage() {
-  const { user } = useAuth()
-  const isReadOnly = user?.role === 'manager'
+  const { can } = useAuth()
+  const canCreateDirect = can('update', 'cases')  // Only those who can edit can create directly
+  const canDelete = can('delete', 'cases')
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
@@ -193,7 +194,7 @@ export function CasesPage() {
           subtitle="Track and manage mortgage cases"
           actionLabel="New Case"
           onAction={() => { setSelectedCaseId('new'); setSidePanelOpen(true) }}
-          hideAction={isReadOnly}
+          hideAction={!canCreateDirect}
         />
 
         <div className="flex items-center gap-3 mt-4">
@@ -297,7 +298,7 @@ export function CasesPage() {
                       <button onClick={(e) => { e.stopPropagation(); setSelectedClientId(caseItem.client.id) }} className="p-1 text-gray-400 hover:text-[#1e3a5f] hover:bg-gray-100 rounded transition-colors" title="View client">
                         <User className="h-3.5 w-3.5" />
                       </button>
-                      {!isReadOnly && (
+                      {canDelete && (
                         <button onClick={(e) => { e.stopPropagation(); handleDelete(caseItem) }} className="p-1 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition-colors">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>

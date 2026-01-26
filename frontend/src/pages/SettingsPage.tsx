@@ -226,7 +226,7 @@ export function SLASettingsPage() {
       {clientToCaseConfig && (
         <div className="mx-6 mb-4 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-xs font-semibold text-gray-900">Client First Contact to Case SLA</h2>
+            <h2 className="text-xs font-semibold text-gray-900">Client to Case SLA</h2>
             <p className="text-xs text-gray-500 mt-0.5">Time allowed from first contact until case created or client closed</p>
           </div>
           <div className="px-4 py-3">

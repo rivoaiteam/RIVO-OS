@@ -17,10 +17,13 @@ def format_sla_duration(minutes: int, suffix: str = 'remaining') -> str:
         Formatted string like "2h remaining", "1d 12h remaining", "2w overdue", "1mo remaining"
     """
     if minutes < 60:
-        return f"{minutes}m {suffix}"
+        return f"{minutes}mins {suffix}"
     elif minutes < 1440:  # Less than 24 hours
         hours = minutes // 60
-        return f"{hours}h {suffix}"
+        remaining_mins = minutes % 60
+        if remaining_mins > 0:
+            return f"{hours}hrs {remaining_mins}mins {suffix}"
+        return f"{hours}hrs {suffix}"
     elif minutes < 10080:  # Less than 7 days
         days = minutes // 1440
         remaining_hours = (minutes % 1440) // 60

@@ -34,6 +34,7 @@ from users.serializers import (
     UserUpdateSerializer,
 )
 from users.utils import can_deactivate_user
+from users.iam import get_user_permissions
 
 # Check if using local auth (default: True for development)
 USE_LOCAL_AUTH = os.environ.get('USE_LOCAL_AUTH', 'true').lower() == 'true'
@@ -103,9 +104,9 @@ def login_view(request: Request) -> Response:
         )
 
     try:
-        # Find user by username
+        # Find user by username (username is stored lowercase)
         try:
-            user = User.objects.get(username__iexact=username)
+            user = User.objects.get(username=username)
         except User.DoesNotExist:
             return Response(
                 {'error': 'Invalid username or password.'},
@@ -127,6 +128,7 @@ def login_view(request: Request) -> Response:
                 )
 
             token = generate_jwt_token(user)
+            permissions = get_user_permissions(user)
             return Response({
                 'access_token': token,
                 'user': {
@@ -135,7 +137,8 @@ def login_view(request: Request) -> Response:
                     'email': user.email,
                     'name': user.name,
                     'role': user.role,
-                }
+                },
+                'permissions': permissions['permissions'],
             })
 
         # Supabase auth
@@ -151,6 +154,7 @@ def login_view(request: Request) -> Response:
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
+        permissions = get_user_permissions(user)
         return Response({
             'access_token': auth_response.session.access_token,
             'refresh_token': auth_response.session.refresh_token,
@@ -160,7 +164,8 @@ def login_view(request: Request) -> Response:
                 'email': user.email,
                 'name': user.name,
                 'role': user.role,
-            }
+            },
+            'permissions': permissions['permissions'],
         })
 
     except Exception as e:
@@ -281,18 +286,20 @@ def reset_all_passwords_view(request: Request) -> Response:
 @permission_classes([IsAuthenticated])
 def me_view(request: Request) -> Response:
     """
-    Get current user's profile.
+    Get current user's profile with permissions.
 
     GET /auth/me
-    Returns: { id, email, name, role, is_active }
+    Returns: { id, email, name, role, is_active, permissions }
     """
     user = request.user
+    permissions = get_user_permissions(user)
     return Response({
         'id': str(user.id),
         'email': user.email,
         'name': user.name,
         'role': user.role,
         'is_active': user.is_active,
+        'permissions': permissions['permissions'],
     })
 
 

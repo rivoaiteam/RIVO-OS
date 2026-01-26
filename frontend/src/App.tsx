@@ -12,6 +12,7 @@ import { CasesPage } from '@/pages/CasesPage'
 import { SLASettingsPage, TemplatesSettingsPage } from '@/pages/SettingsPage'
 import { TemplateListReadOnly } from '@/components/templates/TemplateListReadOnly'
 import { TeamPerformancePage } from '@/pages/TeamPerformancePage'
+import { DashboardPage } from '@/pages/DashboardPage'
 import './index.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -81,7 +82,7 @@ function AppRoutes() {
                   <Route path="/" element={<Navigate to={getDefaultRoute()} replace />} />
 
                   {/* Workspace */}
-                  <Route path="/dashboard" element={<ModulePage />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
                   <Route path="/leads" element={<LeadsPage />} />
                   <Route path="/clients" element={<ClientsPage />} />
                   <Route path="/cases" element={<CasesPage />} />

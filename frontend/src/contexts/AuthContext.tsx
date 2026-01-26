@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import type { User, AuthContextType } from '@/types/auth'
+import type { User, AuthContextType, Permissions, Resource, LoginResponse } from '@/types/auth'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -10,9 +10,10 @@ interface AuthProviderProps {
 const AUTH_KEY = 'rivo-auth'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
-interface LoginResponse {
+interface StoredAuth {
   access_token: string
   user: User
+  permissions: Permissions
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -20,7 +21,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const stored = localStorage.getItem(AUTH_KEY)
     if (stored) {
       try {
-        const auth = JSON.parse(stored)
+        const auth: StoredAuth = JSON.parse(stored)
         return auth.user
       } catch {
         return null
@@ -28,6 +29,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     return null
   })
+
+  const [permissions, setPermissions] = useState<Permissions | null>(() => {
+    const stored = localStorage.getItem(AUTH_KEY)
+    if (stored) {
+      try {
+        const auth: StoredAuth = JSON.parse(stored)
+        return auth.permissions
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
+
   const [isLoading, setIsLoading] = useState(false)
 
   const login = useCallback(async (username: string, password: string) => {
@@ -46,9 +61,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const auth: LoginResponse = await response.json()
 
-      // Store auth data (token + user)
-      localStorage.setItem(AUTH_KEY, JSON.stringify(auth))
+      // Store auth data (token + user + permissions)
+      const storedAuth: StoredAuth = {
+        access_token: auth.access_token,
+        user: auth.user,
+        permissions: auth.permissions,
+      }
+      localStorage.setItem(AUTH_KEY, JSON.stringify(storedAuth))
       setUser(auth.user)
+      setPermissions(auth.permissions)
     } finally {
       setIsLoading(false)
     }
@@ -56,6 +77,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = useCallback(() => {
     setUser(null)
+    setPermissions(null)
     localStorage.removeItem(AUTH_KEY)
   }, [])
 
@@ -64,31 +86,45 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!stored) return
 
     try {
-      const auth = JSON.parse(stored)
+      const auth: StoredAuth = JSON.parse(stored)
       const response = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: { 'Authorization': `Bearer ${auth.access_token}` },
       })
 
       if (response.ok) {
         const userData = await response.json()
-        const updatedAuth = { ...auth, user: userData }
+        const updatedAuth: StoredAuth = {
+          ...auth,
+          user: userData,
+          permissions: userData.permissions,
+        }
         localStorage.setItem(AUTH_KEY, JSON.stringify(updatedAuth))
         setUser(userData)
+        setPermissions(userData.permissions)
       }
     } catch {
       // Silently fail - user data will refresh on next login
     }
   }, [])
 
+  const can = useCallback((action: 'view' | 'create' | 'update' | 'delete', resource: Resource): boolean => {
+    if (!permissions) return false
+    const resourcePerms = permissions[resource]
+    if (!resourcePerms) return false
+    return resourcePerms[action] ?? false
+  }, [permissions])
+
   return (
     <AuthContext.Provider
       value={{
         user,
+        permissions,
         isAuthenticated: !!user,
         isLoading,
         login,
         logout,
         refreshUser,
+        can,
       }}
     >
       {children}

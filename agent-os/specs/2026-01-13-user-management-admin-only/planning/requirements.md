@@ -129,9 +129,34 @@ N/A - No mockups or wireframes available.
 | Role | Description |
 |------|-------------|
 | Admin | System configuration. Manages users, channels, bank products, templates. No operational access. |
-| Manager | Operations oversight. Sees all clients/cases. Can reassign work. Read-only on operational data. |
-| Mortgage Specialist (MS) | Works clients to cases. Collects data/docs, creates cases. Owns client records. |
-| Process Executive (PE) | Works cases to disbursement. Verifies docs, submits to bank. Owns case records. |
+| Manager | Operations oversight. Read-only on operational data. |
+| Mortgage Specialist (MS) | Full access on leads and clients. Can create cases (convert client to case). |
+| Process Executive (PE) | Full access on clients and cases. View-only on leads. |
+
+**IAM Permission Matrix:**
+
+| Resource | Admin | Manager | MS | PE |
+|----------|-------|---------|----|----|
+| Leads | - | View | Full | View |
+| Clients | - | View | Full | Full |
+| Cases | - | View | View + Create | Full |
+| Users | Full | - | - | - |
+| Channels | Full | - | - | - |
+| Templates | Full | View | View | View |
+| Bank Products | Full | - | - | - |
+| SLA Config | Full | - | - | - |
+| Audit Logs | View | View | - | - |
+
+**Full** = View, Create, Update, Delete
+**View + Create** = Can view and create, but not update or delete
+
+**See `agent-os/specs/iam-config.md` for complete IAM documentation.**
+
+**Implementation Notes:**
+- Permission matrix is defined centrally in `backend/users/iam.py`
+- Frontend receives permissions on login and stores in AuthContext
+- Use `can(action, resource)` helper in frontend to check permissions
+- Use `HasResourcePermission` DRF class in backend for API protection
 
 ### Scope Boundaries
 

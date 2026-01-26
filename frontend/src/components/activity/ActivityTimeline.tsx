@@ -18,8 +18,11 @@ interface ActivityTimelineProps {
 }
 
 export function ActivityTimeline({ recordType, recordId, readOnly: readOnlyProp }: ActivityTimelineProps) {
-  const { user } = useAuth()
-  const isReadOnly = readOnlyProp || user?.role === 'manager'
+  const { can } = useAuth()
+  // Check update permission on the parent resource (leads, clients, cases)
+  const resourceMap = { lead: 'leads', client: 'clients', case: 'cases' } as const
+  const resource = resourceMap[recordType]
+  const isReadOnly = readOnlyProp || !can('update', resource)
   const [showNoteForm, setShowNoteForm] = useState(false)
   const { data: groups, isLoading, error, refetch } = useActivityTimeline(recordType, recordId)
 

@@ -115,8 +115,9 @@ function CaseDropdown({ cases, onSelect, banks }: {
 }
 
 export function ClientsPage() {
-  const { user } = useAuth()
-  const isReadOnly = user?.role === 'manager'
+  const { can } = useAuth()
+  const canCreate = can('create', 'clients')
+  const canDelete = can('delete', 'clients')
   const [statusError, setStatusError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<ClientStatus | 'all'>('all')
@@ -171,7 +172,7 @@ export function ClientsPage() {
           subtitle="Manage mortgage applicants and their eligibility"
           actionLabel="New Client"
           onAction={() => setSelectedClientId('new')}
-          hideAction={isReadOnly}
+          hideAction={!canCreate}
         />
 
         <div className="flex items-center gap-4 mt-4">
@@ -252,7 +253,7 @@ export function ClientsPage() {
                         {client.active_case_id && client.active_case_id.length > 0 && (
                           <CaseDropdown cases={client.active_case_id} onSelect={setSelectedCaseId} banks={banks} />
                         )}
-                        {!isReadOnly && (
+                        {canDelete && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(client) }}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition-colors"

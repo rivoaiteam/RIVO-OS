@@ -117,6 +117,9 @@ class User(models.Model):
 
     def save(self, *args, **kwargs) -> None:
         """Run full clean before saving."""
+        # Normalize username to lowercase for consistent lookups
+        if self.username:
+            self.username = self.username.lower().strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

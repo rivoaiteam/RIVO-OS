@@ -444,11 +444,10 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
 }
 
 function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: () => void }) {
-  const { user } = useAuth()
+  const { can } = useAuth()
 
-  // Permission check - managers have read-only access per IAM specs
-  const isReadOnly = user?.role === 'manager'
-  const canEdit = !isReadOnly && (user?.role === 'admin' || user?.role === 'mortgage_specialist' || user?.role === 'process_executive')
+  // Permission check based on IAM
+  const canEdit = can('update', 'cases')
 
   // Tab state
   const [activeTab, setActiveTab] = useState<CaseTabType>('details')
@@ -571,7 +570,7 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
             <h2 className="text-lg font-semibold text-gray-900">
               Case #{caseData.id.slice(0, 8).toUpperCase()}
             </h2>
-            {isTerminal ? (
+            {isTerminal || !canEdit ? (
               <span className={cn('px-2 py-0.5 text-xs font-medium rounded', stageColors[caseData.stage])}>
                 {getStageLabel(caseData.stage)}
               </span>
@@ -580,7 +579,6 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
                 stage={caseData.stage}
                 onChange={handleStageChange}
                 isLoading={changeStageMutation.isPending}
-                disabled={isReadOnly}
               />
             )}
           </div>

@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 export function Sidebar() {
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const {
     sidebarCollapsed,
     sidebarOpen,
@@ -18,7 +18,7 @@ export function Sidebar() {
   } = useLayout()
   const { sections, settingsItems } = useNavigationItems()
 
-  // Only fetch breach count for managers
+  // Only fetch breach count for managers (those who can view audit logs / oversight)
   const { data: breachCount } = useSLABreachCount()
   const isManager = user?.role === 'manager'
 
