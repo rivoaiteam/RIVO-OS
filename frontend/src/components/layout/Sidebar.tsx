@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 
 export function Sidebar() {
   const location = useLocation()
-  const { user, can } = useAuth()
+  const { user } = useAuth()
   const {
     sidebarCollapsed,
     sidebarOpen,
