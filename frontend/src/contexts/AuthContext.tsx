@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { User, AuthContextType, Permissions, Resource, LoginResponse } from '@/types/auth'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -17,6 +18,8 @@ interface StoredAuth {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  const queryClient = useQueryClient()
+
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem(AUTH_KEY)
     if (stored) {
@@ -47,6 +50,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(async (username: string, password: string) => {
     setIsLoading(true)
+    // Clear any cached data from previous user session
+    queryClient.clear()
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -73,13 +78,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [queryClient])
 
   const logout = useCallback(() => {
     setUser(null)
     setPermissions(null)
     localStorage.removeItem(AUTH_KEY)
-  }, [])
+    // Clear all cached data to prevent stale data from previous user
+    queryClient.clear()
+  }, [queryClient])
 
   const refreshUser = useCallback(async () => {
     const stored = localStorage.getItem(AUTH_KEY)
