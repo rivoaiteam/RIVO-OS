@@ -151,13 +151,18 @@ class ClientListSerializer(serializers.ModelSerializer):
         return obj.client_to_case_sla_status
 
     def get_active_case_id(self, obj: Client) -> list[dict] | None:
-        """Get list of active cases for this client."""
-        from cases.models import Case, CaseStage
-        active_cases = Case.objects.filter(
-            client=obj
-        ).exclude(
-            stage__in=[CaseStage.REJECTED, CaseStage.NOT_PROCEEDING]
-        ).order_by('-created_at')[:5]  # Limit to 5 most recent
+        """Get list of active cases for this client (uses prefetched data)."""
+        from cases.models import CaseStage
+        terminal_stages = {CaseStage.REJECTED, CaseStage.NOT_PROCEEDING}
+
+        # Use prefetched cases instead of making a new query
+        # Filter in Python to avoid N+1
+        active_cases = [
+            case for case in obj.cases.all()
+            if case.stage not in terminal_stages
+        ]
+        # Sort by created_at descending and limit to 5
+        active_cases = sorted(active_cases, key=lambda c: c.created_at, reverse=True)[:5]
 
         if not active_cases:
             return None
@@ -166,7 +171,7 @@ class ClientListSerializer(serializers.ModelSerializer):
             {
                 'id': str(case.id),
                 'stage': case.stage,
-                'bank': case.bank or 'No bank',
+                'bank': str(case.bank) if case.bank else 'No bank',
                 'loan_amount': str(case.loan_amount),
             }
             for case in active_cases

@@ -70,7 +70,12 @@ class CaseViewSet(viewsets.ModelViewSet):
     NO destroy action (no delete per spec).
     """
 
-    queryset = Case.objects.all().select_related('client', 'assigned_to').order_by('-created_at')
+    queryset = Case.objects.all().select_related(
+        'client',
+        'client__co_applicant',  # For LTV calculations that access co_applicant
+        'assigned_to',
+        'bank',  # Prefetch bank for display
+    ).order_by('-created_at')
     permission_classes = [IsAuthenticated, CanAccessCases]
     pagination_class = CasePagination
 

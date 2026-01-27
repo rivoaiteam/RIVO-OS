@@ -8,6 +8,7 @@ They are created either directly from trusted channels or converted from Leads.
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+from functools import cached_property
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator
 from django.db import models
@@ -584,7 +585,13 @@ class Client(AuditableModel):
             }
 
         # Check if a case already exists for this client
-        if self.cases.exists():
+        # Use prefetch cache if available to avoid N+1
+        if hasattr(self, '_prefetched_objects_cache') and 'cases' in self._prefetched_objects_cache:
+            has_cases = bool(self._prefetched_objects_cache['cases'])
+        else:
+            has_cases = self.cases.exists()
+
+        if has_cases:
             return {
                 'status': 'completed',
                 'remaining_hours': 0,

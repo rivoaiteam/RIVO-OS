@@ -71,7 +71,10 @@ class ClientViewSet(viewsets.ModelViewSet):
         'sub_source__source__channel',
         'converted_from_lead',
         'assigned_to',
-    ).prefetch_related('co_applicant').order_by('-created_at')
+        'co_applicant',  # OneToOne should use select_related
+    ).prefetch_related(
+        'cases',  # Prefetch cases for SLA status check (self.cases.exists())
+    ).order_by('-created_at')
     permission_classes = [IsAuthenticated, CanAccessClients]
     pagination_class = ClientPagination
 

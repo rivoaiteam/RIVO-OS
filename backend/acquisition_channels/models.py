@@ -107,6 +107,9 @@ class Source(models.Model):
         db_table = 'sources'
         ordering = ['name']
         unique_together = ['channel', 'name']
+        indexes = [
+            models.Index(fields=['channel'], name='sources_channel_idx'),
+        ]
 
     def __str__(self):
         return f"{self.channel.name} > {self.name}"
@@ -183,6 +186,11 @@ class SubSource(models.Model):
         db_table = 'sub_sources'
         ordering = ['name']
         unique_together = ['source', 'name']
+        indexes = [
+            models.Index(fields=['source'], name='subsources_source_idx'),
+            models.Index(fields=['linked_user'], name='subsources_linked_user_idx'),
+            models.Index(fields=['status'], name='subsources_status_idx'),
+        ]
 
     def __str__(self):
         return f"{self.source} > {self.name}"

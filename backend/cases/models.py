@@ -770,14 +770,27 @@ class StageSLAConfig(models.Model):
     def __str__(self):
         return f"{self.get_from_stage_display()} -> {self.get_to_stage_display()}: {self.sla_hours}h"
 
+    # Class-level cache for all SLA configs
+    _sla_cache = None
+
     @classmethod
     def get_sla_for_stage(cls, stage: str) -> int | None:
         """
-        Get the SLA hours for a given stage.
+        Get the SLA hours for a given stage (cached).
         Returns the first active SLA config for this stage.
         """
-        config = cls.objects.filter(from_stage=stage, is_active=True).first()
-        return config.sla_hours if config else None
+        if cls._sla_cache is None:
+            # Load all active configs into cache
+            cls._sla_cache = {
+                config.from_stage: config.sla_hours
+                for config in cls.objects.filter(is_active=True)
+            }
+        return cls._sla_cache.get(stage)
+
+    @classmethod
+    def clear_cache(cls):
+        """Clear the cached SLA configs (call after updates)."""
+        cls._sla_cache = None
 
     @classmethod
     def seed_defaults(cls):
@@ -882,15 +895,24 @@ class ClientToCaseSLAConfig(models.Model):
             }
         )
 
+    # Class-level cache for SLA config
+    _config_cache = None
+
     @classmethod
     def get_config(cls):
-        """Get or create the Client to Case SLA config."""
-        config, _ = cls.objects.get_or_create(
-            sla_type='client_to_case',
-            defaults={
-                'sla_hours': 168,
-                'breach_percent': 120,
-                'description': 'Time allowed from client creation to first case creation',
-            }
-        )
-        return config
+        """Get or create the Client to Case SLA config (cached)."""
+        if cls._config_cache is None:
+            cls._config_cache, _ = cls.objects.get_or_create(
+                sla_type='client_to_case',
+                defaults={
+                    'sla_hours': 168,
+                    'breach_percent': 120,
+                    'description': 'Time allowed from client creation to first case creation',
+                }
+            )
+        return cls._config_cache
+
+    @classmethod
+    def clear_cache(cls):
+        """Clear the cached config (call after updates)."""
+        cls._config_cache = None
