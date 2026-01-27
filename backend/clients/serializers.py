@@ -113,8 +113,8 @@ class ClientListSerializer(serializers.ModelSerializer):
     Returns summary fields for table display.
     """
     sub_source = SubSourceNestedSerializer(read_only=True)
-    dbr_available = serializers.DecimalField(
-        max_digits=12, decimal_places=2, read_only=True
+    dbr_percentage = serializers.DecimalField(
+        max_digits=5, decimal_places=2, read_only=True
     )
     sla_display = serializers.SerializerMethodField()
     active_case_id = serializers.SerializerMethodField()
@@ -126,13 +126,13 @@ class ClientListSerializer(serializers.ModelSerializer):
         model = Client
         fields = [
             'id', 'name', 'phone', 'email', 'status',
-            'application_type', 'dbr_available',
+            'application_type', 'dbr_percentage',
             'property_value', 'loan_amount', 'ltv_status',
             'sub_source', 'sla_display', 'active_case_id',
             'first_contact_sla_status', 'client_to_case_sla_status',
             'created_at', 'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'dbr_available']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'dbr_percentage']
 
     def get_ltv_status(self, obj: Client) -> dict:
         """Get LTV status for display."""
@@ -194,8 +194,8 @@ class ClientDetailSerializer(serializers.ModelSerializer):
     total_monthly_liabilities = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
     )
-    dbr_available = serializers.DecimalField(
-        max_digits=12, decimal_places=2, read_only=True
+    dbr_percentage = serializers.DecimalField(
+        max_digits=5, decimal_places=2, read_only=True
     )
     max_loan_amount = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
@@ -240,7 +240,7 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             'extra_details',
             # Computed
             'total_cc_liability', 'total_loan_emis', 'total_monthly_liabilities',
-            'dbr_available', 'max_loan_amount', 'ltv_status', 'can_create_case',
+            'dbr_percentage', 'max_loan_amount', 'ltv_status', 'can_create_case',
             # SLA Status
             'first_contact_sla_status', 'client_to_case_sla_status',
             'first_contact_completed_at', 'assigned_to',
@@ -252,7 +252,7 @@ class ClientDetailSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'created_at', 'updated_at', 'converted_from_lead',
             'total_cc_liability', 'total_loan_emis', 'total_monthly_liabilities',
-            'dbr_available', 'max_loan_amount', 'first_contact_completed_at',
+            'dbr_percentage', 'max_loan_amount', 'first_contact_completed_at',
         ]
 
     def get_ltv_status(self, obj: Client) -> dict:

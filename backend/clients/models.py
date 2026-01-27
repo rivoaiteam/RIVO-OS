@@ -744,6 +744,21 @@ class Client(AuditableModel):
         return half_income - combined_liabilities
 
     @property
+    def dbr_percentage(self) -> Decimal:
+        """
+        Calculate DBR (Debt Burden Ratio) as percentage.
+        Formula: (Combined Liabilities / Total Income) * 100
+        Standard bank metric - capped at 50% typically.
+        Example: Income 20,000, Liabilities 6,000 → DBR = 30%
+        """
+        total_income = self._get_total_income()
+        if not total_income or total_income <= 0:
+            return Decimal('0.00')
+
+        combined_liabilities = self._get_combined_liabilities()
+        return (combined_liabilities / total_income) * Decimal('100')
+
+    @property
     def max_loan_amount(self) -> Decimal:
         """
         Calculate maximum loan amount.

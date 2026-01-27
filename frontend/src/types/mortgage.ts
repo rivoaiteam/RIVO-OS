@@ -277,7 +277,7 @@ export interface ClientListItem {
   email: string | null
   status: ClientStatus
   application_type: ApplicationType | null
-  dbr_available: string | null
+  dbr_percentage: string | null
   property_value: string | null
   loan_amount: string | null
   ltv_status: LtvStatusData | null
@@ -345,7 +345,7 @@ export interface ClientData {
   total_cc_liability: string
   total_loan_emis: string
   total_monthly_liabilities: string
-  dbr_available: string
+  dbr_percentage: string
   max_loan_amount: string
   ltv_status: LtvStatusData
   can_create_case: {

@@ -327,12 +327,12 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0)
 
     const totalLiab = ccLiability + loanEMIs
-    const dbrAvailable = totalIncome / 2 - totalLiab
+    const dbrPercentage = totalIncome > 0 ? (totalLiab / totalIncome) * 100 : 0
     const maxLoanAmount = totalIncome * 68
 
     return {
       totalLiabilities: Math.round(totalLiab * 100) / 100,
-      dbrAvailable: Math.round(dbrAvailable * 100) / 100,
+      dbrPercentage: Math.round(dbrPercentage * 100) / 100,
       maxLoanAmount: Math.round(maxLoanAmount * 100) / 100,
     }
   }, [monthlySalary, totalAddbacks, coBorrowerSalary, applicationType, liabilities])
@@ -958,9 +958,9 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Eligibility</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">DBR Available</span>
-                  <span className={`text-sm font-bold ${calculations.dbrAvailable >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    AED {calculations.dbrAvailable.toLocaleString()}
+                  <span className="text-[10px] font-medium text-gray-400 uppercase block mb-1">DBR (50% max)</span>
+                  <span className={`text-sm font-bold ${calculations.dbrPercentage < 30 ? 'text-green-600' : calculations.dbrPercentage <= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {calculations.dbrPercentage.toFixed(1)}%
                   </span>
                 </div>
                 <div className="text-center p-3 bg-gray-50 rounded-lg">

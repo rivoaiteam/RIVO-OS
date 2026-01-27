@@ -238,8 +238,8 @@ export function ClientsPage() {
                       </span>
                     </td>
                     <td className="py-3">
-                      <span className={cn('text-xs font-medium', getDbrColorClass(client.dbr_available))}>
-                        {formatDbr(client.dbr_available)}
+                      <span className={cn('text-xs font-medium', getDbrColorClass(client.dbr_percentage))}>
+                        {formatDbr(client.dbr_percentage)}
                       </span>
                     </td>
                     <td className="py-3">

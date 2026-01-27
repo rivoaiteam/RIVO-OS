@@ -54,7 +54,7 @@ export function buildVariableMap(data: Partial<ClientData>): Record<string, stri
     // Client financial info
     salary: formatCurrency(data.monthly_salary),
     max_loan: formatCurrency(data.max_loan_amount),
-    dbr: formatCurrency(data.dbr_available),
+    dbr: data.dbr_percentage ? `${parseFloat(data.dbr_percentage).toFixed(1)}%` : '',
 
     // Client profile
     nationality: data.nationality || '',
@@ -96,7 +96,7 @@ export function previewTemplateWithSampleData(content: string): string {
     company_name: 'Emirates Group',
     monthly_salary: '25000',
     max_loan_amount: '1700000',
-    dbr_available: '9000',
+    dbr_percentage: '30',
   }
 
   return fillTemplateVariables(content, sampleData)
