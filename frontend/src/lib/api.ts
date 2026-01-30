@@ -3,7 +3,7 @@
  */
 
 const API_URLS: Record<string, string> = {
-  'app.rivo.ae': 'https://rivo-backend-prod-331738587654.asia-southeast1.run.app/api',
+  'app.rivo.ae': 'https://rivo-backend-331738587654.asia-southeast1.run.app/api',
   'test.rivo.ae': 'https://rivo-backend-test-331738587654.asia-southeast1.run.app/api',
 }
 
