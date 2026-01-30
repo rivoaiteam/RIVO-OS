@@ -2,7 +2,12 @@
  * API client for backend communication.
  */
 
-const API_BASE_URL = (window as any).__ENV__?.VITE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_URLS: Record<string, string> = {
+  'app.rivo.ae': 'https://rivo-backend-prod-331738587654.asia-southeast1.run.app/api',
+  'test.rivo.ae': 'https://rivo-backend-test-331738587654.asia-southeast1.run.app/api',
+}
+
+const API_BASE_URL = API_URLS[window.location.hostname] || 'http://localhost:8000/api'
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | undefined>
