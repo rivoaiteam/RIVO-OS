@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { User, AuthContextType, Permissions, Resource, LoginResponse } from '@/types/auth'
+import { API_BASE_URL } from '@/config/api'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -9,7 +10,6 @@ interface AuthProviderProps {
 }
 
 const AUTH_KEY = 'rivo-auth'
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 interface StoredAuth {
   access_token: string

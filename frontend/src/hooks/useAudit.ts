@@ -5,6 +5,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '@/lib/api'
+import { API_BASE_URL } from '@/config/api'
 import type {
   ActivityTimelineGroup,
   AuditLogQueryParams,
@@ -212,7 +213,7 @@ export function useExportAuditLogs() {
     mutationFn: async (params: AuditLogExportParams) => {
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/admin/audit-logs/export/`,
+          `${API_BASE_URL}/admin/audit-logs/export/`,
           {
             method: 'POST',
             headers: {

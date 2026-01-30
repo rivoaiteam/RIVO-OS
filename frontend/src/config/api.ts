@@ -2,7 +2,12 @@
  * API configuration and client for Rivo OS backend.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_URLS: Record<string, string> = {
+  'app.rivo.ae': 'https://rivo-backend-331738587654.asia-southeast1.run.app/api',
+  'test.rivo.ae': 'https://rivo-backend-test-331738587654.asia-southeast1.run.app/api',
+}
+
+export const API_BASE_URL = API_URLS[window.location.hostname] || 'http://localhost:8000/api'
 
 const TOKEN_KEY = 'rivo-access-token'
 const REFRESH_TOKEN_KEY = 'rivo-refresh-token'
