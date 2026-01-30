@@ -30,6 +30,7 @@ export interface Channel {
   is_active: boolean
   owner: string | null
   owner_name: string | null
+  monthly_spend: string | null
   sources: Source[]
   source_count: number
   created_at: string
@@ -45,6 +46,7 @@ export interface ChannelListItem {
   is_active: boolean
   owner: string | null
   owner_name: string | null
+  monthly_spend: string | null
   source_count: number
   created_at: string
 }
@@ -102,6 +104,7 @@ export function useCreateChannel() {
       is_trusted: boolean
       default_sla_minutes?: number | null
       owner?: string | null
+      monthly_spend?: string | null
     }) => {
       try {
         return await api.post<Channel>('/channels/', data)
@@ -113,7 +116,7 @@ export function useCreateChannel() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
+      queryClient.refetchQueries({ queryKey: ['channels'] })
     },
   })
 }
@@ -160,7 +163,7 @@ export function useDeleteChannel() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
+      queryClient.refetchQueries({ queryKey: ['channels'] })
     },
   })
 }
@@ -183,7 +186,7 @@ export function useAddSource() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
+      queryClient.refetchQueries({ queryKey: ['channels'] })
     },
   })
 }
@@ -229,7 +232,7 @@ export function useDeleteSource() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
+      queryClient.refetchQueries({ queryKey: ['channels'] })
     },
   })
 }

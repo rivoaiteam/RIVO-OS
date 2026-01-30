@@ -82,7 +82,7 @@ export function useCreateClient() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
     },
   })
 }
@@ -106,10 +106,10 @@ export function useUpdateClient() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
-      queryClient.invalidateQueries({ queryKey: ['clients', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['clients', variables.id] })
       // Invalidate documents cache since profile change affects required documents
-      queryClient.invalidateQueries({ queryKey: ['clientDocuments', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['clientDocuments', variables.id] })
     },
   })
 }
@@ -134,8 +134,8 @@ export function useChangeClientStatus() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
-      queryClient.invalidateQueries({ queryKey: ['clients', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['clients', variables.id] })
     },
   })
 }
@@ -160,8 +160,8 @@ export function useUpdateCoApplicant() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
-      queryClient.invalidateQueries({ queryKey: ['clients', variables.clientId] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['clients', variables.clientId] })
     },
   })
 }
@@ -185,9 +185,9 @@ export function useCreateCaseFromClient() {
       }
     },
     onSuccess: (_data, clientId) => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
-      queryClient.invalidateQueries({ queryKey: ['clients', clientId] })
-      queryClient.invalidateQueries({ queryKey: ['cases'] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['clients', clientId] })
+      queryClient.refetchQueries({ queryKey: ['cases'] })
     },
   })
 }
@@ -210,7 +210,7 @@ export function useDeleteClient() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
     },
   })
 }
@@ -373,8 +373,8 @@ export function useUpdateClientExtraDetails() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['clientExtraDetails', variables.clientId] })
-      queryClient.invalidateQueries({ queryKey: ['clients', variables.clientId] })
+      queryClient.refetchQueries({ queryKey: ['clientExtraDetails', variables.clientId] })
+      queryClient.refetchQueries({ queryKey: ['clients', variables.clientId] })
     },
   })
 }

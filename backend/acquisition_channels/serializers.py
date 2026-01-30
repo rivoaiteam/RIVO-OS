@@ -45,7 +45,7 @@ class ChannelSerializer(serializers.ModelSerializer):
         model = Channel
         fields = [
             'id', 'name', 'description', 'is_trusted', 'default_sla_minutes',
-            'is_active', 'owner', 'owner_name', 'sources', 'source_count',
+            'is_active', 'owner', 'owner_name', 'monthly_spend', 'sources', 'source_count',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -65,7 +65,7 @@ class ChannelListSerializer(serializers.ModelSerializer):
         model = Channel
         fields = [
             'id', 'name', 'description', 'is_trusted', 'default_sla_minutes',
-            'is_active', 'owner', 'owner_name', 'source_count',
+            'is_active', 'owner', 'owner_name', 'monthly_spend', 'source_count',
             'created_at'
         ]
         read_only_fields = ['id', 'created_at']
@@ -82,7 +82,7 @@ class ChannelCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Channel
-        fields = ['name', 'description', 'is_trusted', 'default_sla_minutes', 'owner']
+        fields = ['name', 'description', 'is_trusted', 'default_sla_minutes', 'owner', 'monthly_spend']
 
 
 class ChannelUpdateSerializer(serializers.ModelSerializer):
@@ -91,7 +91,7 @@ class ChannelUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Channel
-        fields = ['name', 'description', 'is_trusted', 'default_sla_minutes', 'is_active', 'owner']
+        fields = ['name', 'description', 'is_trusted', 'default_sla_minutes', 'is_active', 'owner', 'monthly_spend']
 
 
 class MSUserSerializer(serializers.ModelSerializer):

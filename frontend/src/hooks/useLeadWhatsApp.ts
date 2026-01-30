@@ -75,7 +75,7 @@ export function useSendLeadWhatsAppMessage() {
     },
     onSuccess: (_data, variables) => {
       // Invalidate the messages query to refetch
-      queryClient.invalidateQueries({ queryKey: ['lead-whatsapp-messages', variables.leadId] })
+      queryClient.refetchQueries({ queryKey: ['lead-whatsapp-messages', variables.leadId] })
     },
   })
 }

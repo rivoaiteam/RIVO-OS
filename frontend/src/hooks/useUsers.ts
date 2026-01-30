@@ -96,7 +96,7 @@ export function useCreateUser() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.refetchQueries({ queryKey: ['users'] })
     },
   })
 }
@@ -119,7 +119,7 @@ export function useUpdateUser() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.refetchQueries({ queryKey: ['users'] })
     },
   })
 }
@@ -142,7 +142,7 @@ export function useDeactivateUser() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.refetchQueries({ queryKey: ['users'] })
     },
   })
 }
@@ -165,7 +165,7 @@ export function useReactivateUser() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.refetchQueries({ queryKey: ['users'] })
     },
   })
 }
@@ -208,7 +208,7 @@ export function useDeleteUser() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.refetchQueries({ queryKey: ['users'] })
     },
   })
 }

@@ -69,7 +69,7 @@ export function useCreateLead() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] })
+      queryClient.refetchQueries({ queryKey: ['leads'] })
     },
   })
 }
@@ -92,8 +92,8 @@ export function useUpdateLead() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] })
-      queryClient.invalidateQueries({ queryKey: ['leads', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['leads'] })
+      queryClient.refetchQueries({ queryKey: ['leads', variables.id] })
     },
   })
 }
@@ -119,8 +119,8 @@ export function useChangeLeadStatus() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] })
-      queryClient.invalidateQueries({ queryKey: ['leads', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['leads'] })
+      queryClient.refetchQueries({ queryKey: ['leads', variables.id] })
     },
   })
 }
@@ -146,9 +146,9 @@ export function useConvertLeadToClient() {
       }
     },
     onSuccess: (_data, leadId) => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] })
-      queryClient.invalidateQueries({ queryKey: ['leads', leadId] })
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['leads'] })
+      queryClient.refetchQueries({ queryKey: ['leads', leadId] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
     },
   })
 }

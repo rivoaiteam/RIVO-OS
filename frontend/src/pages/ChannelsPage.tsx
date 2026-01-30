@@ -12,6 +12,7 @@ import {
   type SourceStatus,
 } from '@/hooks/useChannels'
 import { cn } from '@/lib/utils'
+import { formatCurrencyAED } from '@/lib/formatters'
 import { ChannelSidePanel } from '@/components/ChannelSidePanel'
 import { Pagination } from '@/components/Pagination'
 import { TablePageLayout, TableCard, TableContainer, PageLoading, PageError, StatusErrorToast } from '@/components/ui/TablePageLayout'
@@ -135,9 +136,10 @@ export function ChannelsPage() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="w-8 pb-3"></th>
-                <th className="w-1/3 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                <th className="w-1/3 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Owner</th>
-                <th className="w-1/3 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">First Contact SLA</th>
+                <th className="w-[28%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                <th className="w-[22%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Owner</th>
+                <th className="w-[20%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Marketing Spend</th>
+                <th className="w-[20%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">First Contact SLA</th>
                 <th className="w-12 text-right pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -219,6 +221,11 @@ function ChannelRowWithNested({
         </td>
         <td className="py-3">
           <span className="text-xs text-gray-500">
+            {channel.monthly_spend ? formatCurrencyAED(channel.monthly_spend) : '\u2014'}
+          </span>
+        </td>
+        <td className="py-3">
+          <span className="text-xs text-gray-500">
             {channel.default_sla_minutes ? `${channel.default_sla_minutes} min` : '\u2014'}
           </span>
         </td>
@@ -245,7 +252,7 @@ function ChannelRowWithNested({
               <td className="py-2 pl-4">
                 <span className="text-gray-300">{'\u2514'}</span>
               </td>
-              <td className="py-2" colSpan={4}>
+              <td className="py-2" colSpan={5}>
                 <button onClick={() => setShowAddSource(true)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
                   <Plus className="h-3.5 w-3.5" />
                   Add Source
@@ -308,6 +315,7 @@ function InlineAddSourceRow({
       </td>
       <td className="py-2"></td>
       <td className="py-2"></td>
+      <td className="py-2"></td>
       <td className="py-2 text-right">
         <div className="flex items-center justify-end gap-1">
           <button onClick={handleSave} disabled={addMutation.isPending || !name.trim()} className="p-1.5 text-green-600 hover:bg-green-100 rounded disabled:opacity-40">
@@ -358,6 +366,7 @@ function SourceRow({
           </span>
         </div>
       </td>
+      <td className="py-2"></td>
       <td className="py-2"></td>
       <td className="py-2">
         <span className="text-xs text-gray-500">

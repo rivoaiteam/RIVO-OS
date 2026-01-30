@@ -126,7 +126,7 @@ export function useCreateTemplate() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['message-templates'] })
+      queryClient.refetchQueries({ queryKey: ['message-templates'] })
     },
   })
 }
@@ -149,8 +149,8 @@ export function useUpdateTemplate() {
       }
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['message-templates'] })
-      queryClient.invalidateQueries({ queryKey: ['message-template', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['message-templates'] })
+      queryClient.refetchQueries({ queryKey: ['message-template', variables.id] })
     },
   })
 }
@@ -173,7 +173,7 @@ export function useDeleteTemplate() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['message-templates'] })
+      queryClient.refetchQueries({ queryKey: ['message-templates'] })
     },
   })
 }

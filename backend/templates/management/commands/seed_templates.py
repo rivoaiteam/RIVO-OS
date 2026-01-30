@@ -4,7 +4,7 @@ Run with: python manage.py seed_templates
 """
 
 from django.core.management.base import BaseCommand
-from templates_app.models import MessageTemplate, TemplateCategory
+from templates.models import MessageTemplate, TemplateCategory
 
 
 TEMPLATES = [

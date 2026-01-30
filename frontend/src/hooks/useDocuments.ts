@@ -78,7 +78,7 @@ export function useCreateDocumentType() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documentTypes'] })
+      queryClient.refetchQueries({ queryKey: ['documentTypes'] })
     },
   })
 }
@@ -103,9 +103,9 @@ export function useDeleteDocumentType() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['documentTypes'] })
-      queryClient.invalidateQueries({ queryKey: ['clientDocuments'] })
-      queryClient.invalidateQueries({ queryKey: ['caseDocuments'] })
+      queryClient.refetchQueries({ queryKey: ['documentTypes'] })
+      queryClient.refetchQueries({ queryKey: ['clientDocuments'] })
+      queryClient.refetchQueries({ queryKey: ['caseDocuments'] })
     },
   })
 }
@@ -149,7 +149,7 @@ export function useUploadClientDocument() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['clientDocuments', variables.clientId] })
+      queryClient.refetchQueries({ queryKey: ['clientDocuments', variables.clientId] })
     },
   })
 }
@@ -174,7 +174,7 @@ export function useDeleteClientDocument() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['clientDocuments', variables.clientId] })
+      queryClient.refetchQueries({ queryKey: ['clientDocuments', variables.clientId] })
     },
   })
 }
@@ -218,7 +218,7 @@ export function useUploadCaseDocument() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['caseDocuments', variables.caseId] })
+      queryClient.refetchQueries({ queryKey: ['caseDocuments', variables.caseId] })
     },
   })
 }
@@ -243,7 +243,7 @@ export function useDeleteCaseDocument() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['caseDocuments', variables.caseId] })
+      queryClient.refetchQueries({ queryKey: ['caseDocuments', variables.caseId] })
     },
   })
 }

@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { X, AlertCircle, Loader2, Briefcase, Lock } from 'lucide-react'
+import { X, AlertCircle, Loader2, Briefcase } from 'lucide-react'
 import {
   useClient,
   useCreateClient,
@@ -644,17 +644,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
             >
               Details
             </button>
-            <button
-              onClick={() => setActiveTab('extra_details')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
-                activeTab === 'extra_details'
-                  ? 'text-[#1e3a5f] border-[#1e3a5f]'
-                  : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
-              )}
-            >
-              Extra Details
-            </button>
+            {/* Extra Details tab hidden for now — code retained */}
             <button
               onClick={() => setActiveTab('documents')}
               className={cn(
@@ -709,7 +699,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
                   <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
                     className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
                 </FormField>
-                <FormField label={<span className="flex items-center gap-1">Phone *{!isCreateMode && client?.phone_locked && <Lock className="h-3 w-3 text-amber-500" title="Locked — WhatsApp messaging started" />}</span>}>
+                <FormField label="Phone *">
                   <div className="flex gap-1">
                     <select
                       value={phoneCountryCode}

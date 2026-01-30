@@ -76,7 +76,7 @@ export function useSendWhatsAppMessage() {
     },
     onSuccess: (_data, variables) => {
       // Invalidate the messages query to refetch
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', variables.clientId] })
+      queryClient.refetchQueries({ queryKey: ['whatsapp-messages', variables.clientId] })
     },
   })
 }

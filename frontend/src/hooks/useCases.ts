@@ -120,8 +120,8 @@ export function useCreateCase() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cases'] })
-      queryClient.invalidateQueries({ queryKey: ['clients'] })
+      queryClient.refetchQueries({ queryKey: ['cases'] })
+      queryClient.refetchQueries({ queryKey: ['clients'] })
     },
   })
 }
@@ -145,8 +145,8 @@ export function useUpdateCase() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['cases'] })
-      queryClient.invalidateQueries({ queryKey: ['cases', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['cases'] })
+      queryClient.refetchQueries({ queryKey: ['cases', variables.id] })
     },
   })
 }
@@ -174,8 +174,8 @@ export function useChangeCaseStage() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['cases'] })
-      queryClient.invalidateQueries({ queryKey: ['cases', variables.id] })
+      queryClient.refetchQueries({ queryKey: ['cases'] })
+      queryClient.refetchQueries({ queryKey: ['cases', variables.id] })
     },
   })
 }
@@ -224,7 +224,7 @@ export function useDeleteCase() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cases'] })
+      queryClient.refetchQueries({ queryKey: ['cases'] })
     },
   })
 }

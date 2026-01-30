@@ -25,5 +25,5 @@ COPY . .
 # Collect static files
 RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
 
-# Run with gunicorn
-CMD exec gunicorn --bind :$PORT --workers 2 --threads 4 --timeout 120 rivo_os.wsgi:application
+# Run migrations then start gunicorn
+CMD python manage.py migrate --noinput && exec gunicorn --bind :$PORT --workers 2 --threads 4 --timeout 120 rivo_os.wsgi:application

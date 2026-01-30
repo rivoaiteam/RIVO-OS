@@ -60,6 +60,14 @@ class Channel(models.Model):
         related_name='owned_channels'
     )
 
+    monthly_spend = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text='Monthly marketing spend for this channel in AED'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

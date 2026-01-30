@@ -57,8 +57,8 @@ export function useCreateNote() {
       }
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['activity', variables.recordType, variables.recordId] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders'] })
+      queryClient.refetchQueries({ queryKey: ['activity', variables.recordType, variables.recordId] })
+      queryClient.refetchQueries({ queryKey: ['dashboard-reminders'] })
     },
   })
 }
@@ -81,8 +81,8 @@ export function useUpdateNote() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders'] })
+      queryClient.refetchQueries({ queryKey: ['activity'] })
+      queryClient.refetchQueries({ queryKey: ['dashboard-reminders'] })
     },
   })
 }
@@ -105,8 +105,8 @@ export function useDeleteNote() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders'] })
+      queryClient.refetchQueries({ queryKey: ['activity'] })
+      queryClient.refetchQueries({ queryKey: ['dashboard-reminders'] })
     },
   })
 }
@@ -142,8 +142,8 @@ export function useCompleteReminder() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders'] })
-      queryClient.invalidateQueries({ queryKey: ['activity'] })
+      queryClient.refetchQueries({ queryKey: ['dashboard-reminders'] })
+      queryClient.refetchQueries({ queryKey: ['activity'] })
     },
   })
 }
@@ -166,8 +166,8 @@ export function useDismissReminder() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard-reminders'] })
-      queryClient.invalidateQueries({ queryKey: ['activity'] })
+      queryClient.refetchQueries({ queryKey: ['dashboard-reminders'] })
+      queryClient.refetchQueries({ queryKey: ['activity'] })
     },
   })
 }

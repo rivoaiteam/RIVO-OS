@@ -39,6 +39,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
   const [isTrusted, setIsTrusted] = useState(false)
   const [slaMinutes, setSlaMinutes] = useState('')
   const [owner, setOwner] = useState('')
+  const [monthlySpend, setMonthlySpend] = useState('')
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // Populate form when channel data loads
@@ -49,6 +50,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
       setIsTrusted(channel.is_trusted)
       setSlaMinutes(channel.default_sla_minutes?.toString() || '')
       setOwner(channel.owner || '')
+      setMonthlySpend(channel.monthly_spend || '')
     }
   }, [channel])
 
@@ -76,6 +78,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
           is_trusted: isTrusted,
           default_sla_minutes: slaMinutes ? parseInt(slaMinutes) : null,
           owner: owner || null,
+          monthly_spend: monthlySpend || null,
         })
       } else {
         await updateMutation.mutateAsync({
@@ -86,6 +89,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
             is_trusted: isTrusted,
             default_sla_minutes: slaMinutes ? parseInt(slaMinutes) : null,
             owner: owner || null,
+            monthly_spend: monthlySpend || null,
           },
         })
       }
@@ -201,6 +205,20 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
               className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
               placeholder="Enter default SLA"
               min="0"
+            />
+          </div>
+
+          {/* Marketing Spend */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Marketing Spend (AED)</label>
+            <input
+              type="number"
+              value={monthlySpend}
+              onChange={(e) => setMonthlySpend(e.target.value)}
+              className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]"
+              placeholder="Monthly marketing spend"
+              min="0"
+              step="0.01"
             />
           </div>
         </div>
