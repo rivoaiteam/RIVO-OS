@@ -3,11 +3,8 @@ import { Settings, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLayout } from '@/contexts/LayoutContext'
 import { useNavigationItems } from '@/hooks/useNavigationItems'
-import { useAuth } from '@/contexts/AuthContext'
-
 export function Sidebar() {
   const location = useLocation()
-  const { user } = useAuth()
   const {
     sidebarCollapsed,
     sidebarOpen,
