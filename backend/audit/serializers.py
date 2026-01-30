@@ -190,14 +190,11 @@ class AuditLogSerializer(serializers.ModelSerializer):
         ]
 
     def get_user_name(self, obj):
-        """Get user name from user_id."""
+        """Get user name from prefetched user map (avoids N+1)."""
         if not obj.user_id:
             return 'System'
-        try:
-            user = User.objects.get(pk=obj.user_id)
-            return user.name
-        except User.DoesNotExist:
-            return 'Unknown User'
+        user_map = self.context.get('user_map', {})
+        return user_map.get(obj.user_id, 'Unknown User')
 
 
 class AuditLogExportSerializer(serializers.Serializer):
@@ -222,6 +219,8 @@ class DashboardReminderSerializer(serializers.ModelSerializer):
     notable_type = serializers.CharField(source='note.notable_type')
     notable_id = serializers.UUIDField(source='note.notable_id')
     notable_name = serializers.SerializerMethodField()
+    client_name = serializers.SerializerMethodField()
+    case_bank = serializers.SerializerMethodField()
     is_overdue = serializers.BooleanField(read_only=True)
     is_due_today = serializers.BooleanField(read_only=True)
     author_name = serializers.SerializerMethodField()
@@ -235,6 +234,8 @@ class DashboardReminderSerializer(serializers.ModelSerializer):
             'notable_type',
             'notable_id',
             'notable_name',
+            'client_name',
+            'case_bank',
             'reminder_date',
             'reminder_time',
             'status',
@@ -254,6 +255,24 @@ class DashboardReminderSerializer(serializers.ModelSerializer):
         if note.lead:
             return note.lead.name
         return 'Unknown'
+
+    def get_client_name(self, obj):
+        """Get the client name. For cases, return the case's client."""
+        note = obj.note
+        if note.client:
+            return note.client.name
+        if note.case and note.case.client:
+            return note.case.client.name
+        if note.lead:
+            return note.lead.name
+        return None
+
+    def get_case_bank(self, obj):
+        """Get the bank name if the reminder is for a case."""
+        note = obj.note
+        if note.case:
+            return note.case.bank or None
+        return None
 
     def get_author_name(self, obj):
         """Get the author's name."""

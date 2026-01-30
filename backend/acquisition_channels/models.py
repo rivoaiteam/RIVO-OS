@@ -1,8 +1,8 @@
 """
 Channel models for Rivo OS Lead Management.
 
-Channels are entry points for leads with three levels of attribution:
-Channel → Source → Sub-source
+Channels are entry points for leads with two levels of attribution:
+Channel -> Source
 """
 
 import uuid
@@ -52,6 +52,14 @@ class Channel(models.Model):
         help_text='Whether this channel is active'
     )
 
+    owner = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='owned_channels'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -65,10 +73,10 @@ class Channel(models.Model):
 
 class Source(models.Model):
     """
-    Mid-level source within a channel.
+    Source within a channel.
 
     Examples: Google Search, Meta (under Performance Marketing),
-    AEON, Partner Hub (under Partner Hub)
+    AEON, Azizi (under Partner Hub)
     """
 
     id = models.UUIDField(
@@ -95,9 +103,20 @@ class Source(models.Model):
         help_text='SLA override in minutes (null = use channel default)'
     )
 
-    is_active = models.BooleanField(
-        default=True,
-        help_text='Whether this source is active'
+    status = models.CharField(
+        max_length=20,
+        choices=[('active', 'Active'), ('inactive', 'Inactive')],
+        default='active',
+        help_text='Source status: active or inactive'
+    )
+
+    linked_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='linked_sources',
+        help_text='Linked MS user (for BH Mortgage Team self-sourcing)'
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -109,10 +128,12 @@ class Source(models.Model):
         unique_together = ['channel', 'name']
         indexes = [
             models.Index(fields=['channel'], name='sources_channel_idx'),
+            models.Index(fields=['status'], name='sources_status_idx'),
+            models.Index(fields=['linked_user'], name='sources_linked_user_idx'),
         ]
 
     def __str__(self):
-        return f"{self.channel.name} > {self.name}"
+        return f"{self.name} ({self.channel.name})"
 
     @property
     def effective_sla_minutes(self):
@@ -122,84 +143,21 @@ class Source(models.Model):
         return self.channel.default_sla_minutes
 
 
-class SubSource(models.Model):
-    """
-    Granular sub-source within a source.
-
-    Examples: Specific campaigns, partner agencies, freelance agents,
-    or MS users (for BH Mortgage Team).
-    """
-
-    class Status(models.TextChoices):
-        # For trusted channels
-        ACTIVE = 'active', 'Active'
-        INACTIVE = 'inactive', 'Inactive'
-        # For untrusted channels
-        INCUBATION = 'incubation', 'Incubation'
-        LIVE = 'live', 'Live'
-        PAUSED = 'paused', 'Paused'
-
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False
-    )
-
-    source = models.ForeignKey(
-        Source,
-        on_delete=models.CASCADE,
-        related_name='sub_sources',
-        help_text='Parent source'
-    )
-
-    name = models.CharField(
-        max_length=100,
-        help_text='Sub-source name (e.g., campaign name, agent name)'
-    )
-
-    sla_minutes = models.PositiveIntegerField(
-        null=True,
-        blank=True,
-        help_text='SLA override in minutes (null = use channel default)'
-    )
-
-    linked_user = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='linked_sub_sources',
-        help_text='Linked MS user (for BH Mortgage Team self-sourcing)'
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.INCUBATION,
-        help_text='Status: active/inactive for trusted, incubation/live/paused for untrusted'
-    )
-
+class Team(models.Model):
+    """Team within a channel. Each team has a team leader, one MS and one PO."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=100)
+    channel = models.ForeignKey('Channel', on_delete=models.CASCADE, related_name='teams')
+    team_leader = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='led_teams')
+    mortgage_specialist = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='ms_teams')
+    process_officer = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='po_teams')
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'sub_sources'
+        db_table = 'teams'
         ordering = ['name']
-        unique_together = ['source', 'name']
-        indexes = [
-            models.Index(fields=['source'], name='subsources_source_idx'),
-            models.Index(fields=['linked_user'], name='subsources_linked_user_idx'),
-            models.Index(fields=['status'], name='subsources_status_idx'),
-        ]
 
     def __str__(self):
-        return f"{self.source} > {self.name}"
-
-    @property
-    def effective_sla_minutes(self):
-        """Get effective SLA with cascade: Sub-source > Source > Channel."""
-        if self.sla_minutes is not None:
-            return self.sla_minutes
-        if self.source.sla_minutes is not None:
-            return self.source.sla_minutes
-        return self.source.channel.default_sla_minutes
+        return f'{self.name} ({self.channel.name})'

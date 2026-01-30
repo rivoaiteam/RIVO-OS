@@ -6,28 +6,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '@/lib/api'
 
-export type SubSourceStatus = 'active' | 'inactive' | 'incubation' | 'live' | 'paused'
-
-export interface SubSource {
-  id: string
-  name: string
-  sla_minutes: number | null
-  effective_sla: number | null
-  linked_user: string | null
-  linked_user_name: string | null
-  status: SubSourceStatus
-  created_at: string
-  updated_at: string
-}
+export type SourceStatus = 'active' | 'inactive'
 
 export interface Source {
   id: string
   name: string
   sla_minutes: number | null
   effective_sla: number | null
-  is_active: boolean
-  sub_sources: SubSource[]
-  sub_source_count: number
+  status: SourceStatus
+  linked_user: string | null
+  linked_user_name: string | null
+  channel_name: string
   created_at: string
   updated_at: string
 }
@@ -39,6 +28,8 @@ export interface Channel {
   is_trusted: boolean
   default_sla_minutes: number | null
   is_active: boolean
+  owner: string | null
+  owner_name: string | null
   sources: Source[]
   source_count: number
   created_at: string
@@ -52,6 +43,8 @@ export interface ChannelListItem {
   is_trusted: boolean
   default_sla_minutes: number | null
   is_active: boolean
+  owner: string | null
+  owner_name: string | null
   source_count: number
   created_at: string
 }
@@ -75,7 +68,6 @@ export function useChannels() {
     queryKey: ['channels'],
     queryFn: async (): Promise<ChannelListItem[]> => {
       const response = await api.get<PaginatedResponse<ChannelListItem> | ChannelListItem[]>('/channels/')
-      // Handle both paginated and non-paginated responses
       if (Array.isArray(response)) {
         return response
       }
@@ -85,7 +77,7 @@ export function useChannels() {
 }
 
 /**
- * Hook for fetching a single channel with sources and sub-sources.
+ * Hook for fetching a single channel with sources.
  */
 export function useChannel(id: string) {
   return useQuery({
@@ -109,6 +101,7 @@ export function useCreateChannel() {
       description?: string
       is_trusted: boolean
       default_sla_minutes?: number | null
+      owner?: string | null
     }) => {
       try {
         return await api.post<Channel>('/channels/', data)
@@ -143,7 +136,6 @@ export function useUpdateChannel() {
       }
     },
     onSuccess: (_data, variables) => {
-      // Refetch all channel queries to update inherited SLA values
       queryClient.refetchQueries({ queryKey: ['channels'] })
       queryClient.refetchQueries({ queryKey: ['channels', variables.id] })
     },
@@ -203,7 +195,7 @@ export function useUpdateSource() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { name?: string; sla_minutes?: number | null; is_active?: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { name?: string; sla_minutes?: number | null; status?: SourceStatus; linked_user?: string | null } }) => {
       try {
         return await api.patch<Source>(`/sources/${id}/`, data)
       } catch (error) {
@@ -214,7 +206,6 @@ export function useUpdateSource() {
       }
     },
     onSuccess: () => {
-      // Refetch to update inherited SLA values for sub-sources
       queryClient.refetchQueries({ queryKey: ['channels'] })
     },
   })
@@ -244,93 +235,13 @@ export function useDeleteSource() {
 }
 
 /**
- * Hook for adding a sub-source to a source.
- */
-export function useAddSubSource() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({
-      sourceId,
-      data,
-    }: {
-      sourceId: string
-      data: {
-        name: string
-        sla_minutes?: number | null
-        linked_user?: string | null
-        status?: SubSourceStatus
-      }
-    }) => {
-      try {
-        return await api.post<SubSource>(`/sources/${sourceId}/add_sub_source/`, data)
-      } catch (error) {
-        if (error instanceof ApiError) {
-          throw new Error((error.data as { error?: string })?.error || 'Failed to add sub-source')
-        }
-        throw error
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
-    },
-  })
-}
-
-/**
- * Hook for updating a sub-source.
- */
-export function useUpdateSubSource() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<SubSource> }) => {
-      try {
-        return await api.patch<SubSource>(`/sub-sources/${id}/`, data)
-      } catch (error) {
-        if (error instanceof ApiError) {
-          throw new Error((error.data as { error?: string })?.error || 'Failed to update sub-source')
-        }
-        throw error
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
-    },
-  })
-}
-
-/**
- * Hook for deleting a sub-source.
- */
-export function useDeleteSubSource() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      try {
-        await api.delete(`/sub-sources/${id}/`)
-      } catch (error) {
-        if (error instanceof ApiError) {
-          throw new Error((error.data as { error?: string })?.error || 'Failed to delete sub-source')
-        }
-        throw error
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
-    },
-  })
-}
-
-/**
  * Hook for fetching MS users for BH Mortgage Team dropdown.
  */
 export function useMSUsers() {
   return useQuery({
     queryKey: ['ms-users'],
     queryFn: async (): Promise<MSUser[]> => {
-      return await api.get<MSUser[]>('/sub-sources/ms_users/')
+      return await api.get<MSUser[]>('/sources/ms_users/')
     },
   })
 }
@@ -341,15 +252,13 @@ export function useMSUsers() {
 export interface SourceFilterOption {
   id: string
   name: string
-  sourceName: string
   channelName: string
   isTrusted: boolean
 }
 
-interface SubSourceFilterResponse {
+interface SourceFilterResponse {
   id: string
   name: string
-  source_name: string
   channel_name: string
   is_trusted: boolean
 }
@@ -362,13 +271,12 @@ export function useSourcesForFilter(filter: 'trusted' | 'untrusted' | 'all' = 'a
   return useQuery({
     queryKey: ['sources-filter', filter],
     queryFn: async (): Promise<SourceFilterOption[]> => {
-      const response = await api.get<SubSourceFilterResponse[]>('/sub-sources/for_filter/', {
+      const response = await api.get<SourceFilterResponse[]>('/sources/for_filter/', {
         trust: filter,
       })
       return response.map((item) => ({
         id: item.id,
         name: item.name,
-        sourceName: item.source_name,
         channelName: item.channel_name,
         isTrusted: item.is_trusted,
       }))

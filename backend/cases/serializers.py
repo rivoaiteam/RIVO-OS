@@ -10,7 +10,7 @@ from rest_framework import serializers
 
 from cases.models import (
     Case, CaseStage, RateType, MortgageType, PropertyCategory,
-    CaseType, Emirate, FixedPeriod, Bank, TERMINAL_STAGES, StageSLAConfig, ClientToCaseSLAConfig
+    CaseType, Emirate, FixedPeriod, Bank, TERMINAL_STAGES,
 )
 from clients.models import Client, ApplicationType, PropertyType, TransactionType
 
@@ -395,66 +395,6 @@ class StageChangeSerializer(serializers.Serializer):
             raise serializers.ValidationError(reason)
 
         return value
-
-
-class StageSLAConfigSerializer(serializers.ModelSerializer):
-    """Serializer for Stage SLA Configuration."""
-
-    from_stage_display = serializers.CharField(source='get_from_stage_display', read_only=True)
-    to_stage_display = serializers.CharField(source='get_to_stage_display', read_only=True)
-
-    class Meta:
-        model = StageSLAConfig
-        fields = [
-            'id',
-            'from_stage',
-            'from_stage_display',
-            'to_stage',
-            'to_stage_display',
-            'sla_hours',
-            'breach_percent',
-            'is_active',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
-class StageSLAConfigUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating SLA config."""
-
-    class Meta:
-        model = StageSLAConfig
-        fields = ['sla_hours', 'breach_percent']
-
-
-class ClientToCaseSLAConfigSerializer(serializers.ModelSerializer):
-    """Serializer for Client to Case SLA Configuration."""
-
-    sla_type_display = serializers.CharField(source='get_sla_type_display', read_only=True)
-
-    class Meta:
-        model = ClientToCaseSLAConfig
-        fields = [
-            'id',
-            'sla_type',
-            'sla_type_display',
-            'sla_hours',
-            'breach_percent',
-            'description',
-            'is_active',
-            'created_at',
-            'updated_at',
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
-class ClientToCaseSLAConfigUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for updating Client to Case SLA config."""
-
-    class Meta:
-        model = ClientToCaseSLAConfig
-        fields = ['sla_hours', 'breach_percent']
 
 
 class CaseReassignSerializer(serializers.Serializer):

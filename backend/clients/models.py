@@ -15,7 +15,7 @@ from django.db import models
 from django.utils import timezone
 
 from audit.models import AuditableModel
-from acquisition_channels.models import SubSource
+from acquisition_channels.models import Source
 from common.sla import format_sla_duration
 
 
@@ -369,11 +369,11 @@ class Client(AuditableModel):
         help_text='Current status of the client'
     )
 
-    sub_source = models.ForeignKey(
-        SubSource,
+    source = models.ForeignKey(
+        Source,
         on_delete=models.PROTECT,
         related_name='clients',
-        help_text='Sub-source where client originated'
+        help_text='Source where client originated'
     )
 
     converted_from_lead = models.ForeignKey(
@@ -418,7 +418,7 @@ class Client(AuditableModel):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status'], name='clients_status_idx'),
-            models.Index(fields=['sub_source'], name='clients_sub_source_idx'),
+            models.Index(fields=['source'], name='clients_source_idx'),
             models.Index(fields=['created_at'], name='clients_created_at_idx'),
             models.Index(fields=['assigned_to'], name='clients_assigned_to_idx'),
         ]
@@ -429,8 +429,8 @@ class Client(AuditableModel):
     @property
     def effective_sla_minutes(self):
         """Get effective SLA in minutes from the channel cascade."""
-        if self.sub_source:
-            return self.sub_source.effective_sla_minutes
+        if self.source:
+            return self.source.effective_sla_minutes
         return None
 
     @property
@@ -635,20 +635,20 @@ class Client(AuditableModel):
         """Validate model fields."""
         super().clean()
 
-        # Only validate sub_source on creation (not on updates)
-        if self._state.adding and self.sub_source_id:
+        # Only validate source on creation (not on updates)
+        if self._state.adding and self.source_id:
             try:
-                sub_source = SubSource.objects.select_related(
-                    'source__channel'
-                ).get(pk=self.sub_source_id)
+                source = Source.objects.select_related(
+                    'channel'
+                ).get(pk=self.source_id)
 
-                if not sub_source.source.channel.is_trusted and not self.converted_from_lead_id:
+                if not source.channel.is_trusted and not self.converted_from_lead_id:
                     raise ValidationError({
-                        'sub_source': 'Clients can only be created from trusted channels or converted from leads.'
+                        'source': 'Clients can only be created from trusted channels or converted from leads.'
                     })
-            except SubSource.DoesNotExist:
+            except Source.DoesNotExist:
                 raise ValidationError({
-                    'sub_source': 'Invalid sub_source.'
+                    'source': 'Invalid source.'
                 })
 
     def save(self, *args, **kwargs) -> None:
@@ -756,7 +756,7 @@ class Client(AuditableModel):
         Calculate DBR (Debt Burden Ratio) as percentage.
         Formula: (Combined Liabilities / Total Income) * 100
         Standard bank metric - capped at 50% typically.
-        Example: Income 20,000, Liabilities 6,000 → DBR = 30%
+        Example: Income 20,000, Liabilities 6,000 -> DBR = 30%
         """
         total_income = self._get_total_income()
         if not total_income or total_income <= 0:

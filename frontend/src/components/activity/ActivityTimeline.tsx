@@ -51,7 +51,7 @@ export function ActivityTimeline({ recordType, recordId, readOnly: readOnlyProp 
 
   return (
     <div className="space-y-4">
-      {/* Add Note Button - hidden for managers */}
+      {/* Add Note Button - hidden for read-only roles */}
       {!isReadOnly && (
         <button
           onClick={() => setShowNoteForm(!showNoteForm)}

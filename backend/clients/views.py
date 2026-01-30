@@ -6,8 +6,10 @@ status changes, co-applicant management, and case creation.
 """
 
 import logging
+from datetime import timedelta
 
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -26,7 +28,6 @@ from clients.serializers import (
     ClientExtraDetailsCreateUpdateSerializer,
 )
 from users.permissions import IsAuthenticated, CanAccessClients
-from users.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +63,13 @@ class ClientViewSet(viewsets.ModelViewSet):
     - POST /clients/{id}/change_status - Change client status
     - POST /clients/{id}/update_co_applicant - Create/update co-applicant
     - POST /clients/{id}/create_case - Create case from client
-    - PATCH /clients/{id}/reassign - Reassign client owner (Manager only)
+    - PATCH /clients/{id}/reassign - Reassign client owner (Channel Owner or Admin)
 
     NO DELETE operation per spec.
     """
 
     queryset = Client.objects.all().select_related(
-        'sub_source__source__channel',
+        'source__channel',
         'converted_from_lead',
         'assigned_to',
         'co_applicant',  # OneToOne should use select_related
@@ -118,37 +119,49 @@ class ClientViewSet(viewsets.ModelViewSet):
         if app_type_filter and app_type_filter in ApplicationType.values:
             queryset = queryset.filter(application_type=app_type_filter)
 
-        # Sub-source filter
-        sub_source_id = self.request.query_params.get('sub_source_id', '').strip()
-        if sub_source_id:
-            queryset = queryset.filter(sub_source_id=sub_source_id)
+        # Source filter
+        source_id = self.request.query_params.get('source_id', '').strip()
+        if source_id:
+            queryset = queryset.filter(source_id=source_id)
 
-        # Source filter (by sub_source channel)
+        # Channel filter
         channel_id = self.request.query_params.get('channel_id', '').strip()
         if channel_id:
-            queryset = queryset.filter(sub_source__source__channel_id=channel_id)
+            queryset = queryset.filter(source__channel_id=channel_id)
 
-        # SLA status filter - filter based on sla_status values
+        # SLA status filter - uses DB-level filtering where possible
         sla_status_filter = self.request.query_params.get('sla_status', '').strip()
         if sla_status_filter:
-            matching_ids = []
-            for client in queryset:
-                # Check both SLA types - use whichever applies
-                sla = client.first_contact_sla_status or client.client_to_case_sla_status
-                if not sla:
-                    continue
-                status = sla.get('status', '')
-                display = sla.get('display', '')
-                is_overdue = status == 'overdue' or 'overdue' in display.lower()
-                is_completed = status == 'completed' or display == 'Completed'
-
-                if sla_status_filter == 'completed' and is_completed:
-                    matching_ids.append(client.id)
-                elif sla_status_filter == 'overdue' and is_overdue:
-                    matching_ids.append(client.id)
-                elif sla_status_filter == 'remaining' and not is_overdue and not is_completed and display:
-                    matching_ids.append(client.id)
-            queryset = queryset.filter(id__in=matching_ids)
+            terminal_statuses = [ClientStatus.DECLINED, ClientStatus.NOT_PROCEEDING]
+            if sla_status_filter == 'completed':
+                # Terminal clients or those with first_contact_completed_at
+                queryset = queryset.filter(
+                    Q(status__in=terminal_statuses) |
+                    Q(first_contact_completed_at__isnull=False)
+                )
+            elif sla_status_filter in ('overdue', 'remaining'):
+                # Exclude terminal and already-completed first
+                active_qs = queryset.exclude(
+                    Q(status__in=terminal_statuses) |
+                    Q(first_contact_completed_at__isnull=False)
+                )
+                now = timezone.now()
+                overdue_ids = []
+                remaining_ids = []
+                for c in active_qs.only(
+                    'id', 'converted_from_lead_id', 'created_at',
+                    'source_id', 'first_contact_completed_at', 'status',
+                ).select_related('source__channel').iterator():
+                    sla_minutes = c.effective_sla_minutes
+                    if sla_minutes is None:
+                        continue
+                    deadline = c.created_at + timedelta(minutes=sla_minutes)
+                    if deadline < now:
+                        overdue_ids.append(c.id)
+                    else:
+                        remaining_ids.append(c.id)
+                ids = overdue_ids if sla_status_filter == 'overdue' else remaining_ids
+                queryset = queryset.filter(id__in=ids)
 
         return queryset
 
@@ -174,7 +187,7 @@ class ClientViewSet(viewsets.ModelViewSet):
         Create a new client.
 
         POST /clients
-        Body: All client fields plus sub_source_id (and optional lead_id for conversion)
+        Body: All client fields plus source_id (and optional lead_id for conversion)
 
         Validates trusted channel OR accepts lead_id for conversion.
         """
@@ -442,4 +455,3 @@ class ClientViewSet(viewsets.ModelViewSet):
                 {'error': f'Failed to update extra details: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-

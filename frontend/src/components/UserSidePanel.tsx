@@ -21,9 +21,10 @@ interface UserSidePanelProps {
 
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
-  { value: 'manager', label: 'Manager' },
+  { value: 'channel_owner', label: 'Channel Owner' },
+  { value: 'team_leader', label: 'Team Leader' },
   { value: 'mortgage_specialist', label: 'Mortgage Specialist' },
-  { value: 'process_executive', label: 'Process Executive' },
+  { value: 'process_officer', label: 'Process Executive' },
 ]
 
 export function UserSidePanel({ userId, onClose }: UserSidePanelProps) {
@@ -241,7 +242,7 @@ export function UserSidePanel({ userId, onClose }: UserSidePanelProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-100 flex-shrink-0">
+        <div className="p-4 flex-shrink-0">
           <div className="flex gap-2">
             <button
               onClick={onClose}

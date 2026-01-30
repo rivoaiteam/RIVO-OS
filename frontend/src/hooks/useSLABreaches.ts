@@ -1,6 +1,6 @@
 /**
  * React Query hooks for SLA Breach management.
- * Connects to the Django backend API for Manager-only SLA breach dashboard.
+ * Connects to the Django backend API for oversight role (Channel Owner / Admin) SLA breach dashboard.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -12,7 +12,7 @@ import type {
 import type { UserData } from '@/hooks/useUsers'
 
 /**
- * Hook for fetching SLA breaches list (Manager only).
+ * Hook for fetching SLA breaches list (Channel Owner / Admin).
  */
 export function useSLABreaches(params: SLABreachesQueryParams = {}) {
   const { sla_type = 'all', owner = 'all', page = 1, page_size = 10, search } = params
@@ -102,7 +102,7 @@ export function useReassignCase() {
 
 /**
  * Hook for fetching active users for reassignment dropdown.
- * Returns only MS and PE users (not managers or admins).
+ * Returns only MS and PO users (not channel owners, team leaders, or admins).
  */
 export function useActiveUsers() {
   return useQuery({
@@ -113,9 +113,9 @@ export function useActiveUsers() {
         status: 'active',
         page_size: 100,
       })
-      // Filter to only MS and PE users for assignment
+      // Filter to only MS and PO users for assignment
       return response.items.filter(
-        user => user.role === 'mortgage_specialist' || user.role === 'process_executive'
+        user => user.role === 'mortgage_specialist' || user.role === 'process_officer'
       )
     },
   })

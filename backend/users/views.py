@@ -24,7 +24,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from users.models import User, UserRole
-from users.permissions import IsAdminRole, IsAuthenticated, IsManager, IsManagerOrAdmin
+from users.permissions import IsAdminRole, IsAuthenticated, IsChannelOwnerOrAdmin
 from users.serializers import (
     ChangePasswordSerializer,
     LoginSerializer,
@@ -310,9 +310,9 @@ class UserViewSet(viewsets.ModelViewSet):
     ViewSet for user management.
 
     Provides CRUD operations for users:
-    - GET /users - List all users (Manager or Admin)
+    - GET /users - List all users (Admin only)
     - POST /users - Create user (Admin only)
-    - GET /users/{id} - Get user details (Manager or Admin)
+    - GET /users/{id} - Get user details (Admin only)
     - PATCH /users/{id} - Update user (Admin only)
     - POST /users/{id}/deactivate - Deactivate user (Admin only)
     - POST /users/{id}/reactivate - Reactivate user (Admin only)
@@ -323,10 +323,8 @@ class UserViewSet(viewsets.ModelViewSet):
     pagination_class = UserPagination
 
     def get_permissions(self):
-        """Return permissions based on action - list/retrieve for managers, all else admin only."""
-        if self.action in ['list', 'retrieve']:
-            return [IsManagerOrAdmin()]
-        return [IsAdminRole()]
+        """Admin and Channel Owner have full user management access."""
+        return [IsChannelOwnerOrAdmin()]
 
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""

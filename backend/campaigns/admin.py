@@ -87,7 +87,7 @@ class CampaignAdmin(admin.ModelAdmin):
             'classes': ['collapse']
         }),
         ('YCloud Integration', {
-            'fields': ['ycloud_campaign_id', 'sub_source'],
+            'fields': ['ycloud_campaign_id', 'source'],
             'classes': ['collapse']
         }),
         ('Metadata', {

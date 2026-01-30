@@ -9,10 +9,11 @@ import { ChannelsPage } from '@/pages/ChannelsPage'
 import { LeadsPage } from '@/pages/LeadsPage'
 import { ClientsPage } from '@/pages/ClientsPage'
 import { CasesPage } from '@/pages/CasesPage'
-import { SLASettingsPage, TemplatesSettingsPage } from '@/pages/SettingsPage'
-import { TemplateListReadOnly } from '@/components/templates/TemplateListReadOnly'
-import { TeamPerformancePage } from '@/pages/TeamPerformancePage'
+import { TemplatesSettingsPage } from '@/pages/SettingsPage'
+import TeamsPage from '@/pages/TeamsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { SLABreachesPage } from '@/pages/SLABreachesPage'
+import { AuditLogPage } from '@/pages/AuditLogPage'
 import './index.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -53,12 +54,7 @@ function AppRoutes() {
   // Get default route based on role
   const getDefaultRoute = () => {
     if (!user) return '/login'
-    switch (user.role) {
-      case 'admin':
-        return '/settings/users'
-      default:
-        return '/dashboard'
-    }
+    return '/dashboard'
   }
 
   return (
@@ -86,28 +82,18 @@ function AppRoutes() {
                   <Route path="/leads" element={<LeadsPage />} />
                   <Route path="/clients" element={<ClientsPage />} />
                   <Route path="/cases" element={<CasesPage />} />
-                  <Route path="/campaigns" element={<ModulePage />} />
-                  <Route path="/agencies" element={<ModulePage />} />
-                  <Route path="/agents" element={<ModulePage />} />
-                  <Route path="/commissions" element={<ModulePage />} />
 
-                  {/* Analytics */}
-                  <Route path="/analytics/team" element={<TeamPerformancePage />} />
-                  <Route path="/analytics/*" element={<ModulePage />} />
+                  {/* Admin workspace routes */}
+                  <Route path="/teams" element={<TeamsPage />} />
+                  <Route path="/channels" element={<ChannelsPage />} />
+                  <Route path="/users" element={<UsersPage />} />
+                  <Route path="/sla-breaches" element={<SLABreachesPage />} />
+                  <Route path="/audit-log" element={<AuditLogPage />} />
 
                   {/* Toolbox */}
                   <Route path="/whatsapp" element={<ModulePage />} />
                   <Route path="/bank-products" element={<ModulePage />} />
-                  <Route path="/templates" element={<TemplateListReadOnly />} />
-
-                  {/* Payouts */}
-                  <Route path="/payouts/*" element={<ModulePage />} />
-
-                  {/* Settings (Admin) */}
-                  <Route path="/settings/users" element={<UsersPage />} />
-                  <Route path="/settings/channels" element={<ChannelsPage />} />
-                  <Route path="/settings/templates" element={<TemplatesSettingsPage />} />
-                  <Route path="/settings/sla" element={<SLASettingsPage />} />
+                  <Route path="/templates" element={<TemplatesSettingsPage />} />
                   <Route path="/settings/*" element={<ModulePage />} />
 
                   {/* Fallback */}

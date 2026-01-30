@@ -749,7 +749,7 @@ class StageSLAConfig(models.Model):
 
     breach_percent = models.PositiveIntegerField(
         default=120,
-        help_text='Percentage of SLA time at which to escalate to manager (e.g., 120 = escalate at 120% of SLA)'
+        help_text='Percentage of SLA time at which to flag as breached (e.g., 120 = breach at 120% of SLA)'
     )
 
     is_active = models.BooleanField(
@@ -832,7 +832,7 @@ class ClientToCaseSLAConfig(models.Model):
     SLA configuration for Client to Case conversion.
 
     Tracks the time allowed from client creation to first case creation.
-    Default is 7 days. If breached, escalates to manager.
+    Default is 7 days. If breached, flags for escalation.
     """
 
     SLA_TYPES = [
@@ -858,7 +858,7 @@ class ClientToCaseSLAConfig(models.Model):
 
     breach_percent = models.PositiveIntegerField(
         default=120,
-        help_text='Percentage of SLA time at which to escalate to manager'
+        help_text='Percentage of SLA time at which to flag as breached'
     )
 
     description = models.TextField(

@@ -30,12 +30,12 @@ export function useClients(params: ClientsQueryParams = {}) {
     search = '',
     status = 'all',
     application_type = 'all',
-    sub_source_id,
+    source_id,
     sla_status,
   } = params
 
   return useQuery({
-    queryKey: ['clients', { page, page_size, search, status, application_type, sub_source_id, sla_status }],
+    queryKey: ['clients', { page, page_size, search, status, application_type, source_id, sla_status }],
     queryFn: async (): Promise<PaginatedResponse<ClientListItem>> => {
       return await api.get<PaginatedResponse<ClientListItem>>('/clients/', {
         page,
@@ -43,7 +43,7 @@ export function useClients(params: ClientsQueryParams = {}) {
         search: search || undefined,
         status: status !== 'all' ? status : undefined,
         application_type: application_type !== 'all' ? application_type : undefined,
-        sub_source_id: sub_source_id || undefined,
+        source_id: source_id || undefined,
         sla_status: sla_status || undefined,
       })
     },

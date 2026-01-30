@@ -34,7 +34,7 @@ class Resource(str, Enum):
     CHANNELS = 'channels'
     TEMPLATES = 'templates'
     BANK_PRODUCTS = 'bank_products'
-    SLA_CONFIG = 'sla_config'
+    TEAMS = 'teams'
     AUDIT_LOGS = 'audit_logs'
 
 
@@ -42,56 +42,58 @@ class Resource(str, Enum):
 # This is the single source of truth for all permissions
 PERMISSIONS = {
     UserRole.ADMIN: {
-        # Admin: System configuration only, no operational access
         Resource.USERS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
         Resource.CHANNELS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
-        Resource.TEMPLATES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
-        Resource.BANK_PRODUCTS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
-        Resource.SLA_CONFIG: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
-        Resource.AUDIT_LOGS: [Action.VIEW],
-        # No access to operational data
-        Resource.LEADS: [],
-        Resource.CLIENTS: [],
-        Resource.CASES: [],
-    },
-    UserRole.MANAGER: {
-        # Manager: Read-only oversight of all operational data
+        Resource.TEAMS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
         Resource.LEADS: [Action.VIEW],
         Resource.CLIENTS: [Action.VIEW],
         Resource.CASES: [Action.VIEW],
+        Resource.TEMPLATES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.BANK_PRODUCTS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
         Resource.AUDIT_LOGS: [Action.VIEW],
-        # Can view templates (for reference)
-        Resource.TEMPLATES: [Action.VIEW],
-        # No access to system config
-        Resource.USERS: [],
-        Resource.CHANNELS: [],
-        Resource.BANK_PRODUCTS: [],
-        Resource.SLA_CONFIG: [],
     },
-    UserRole.MS: {
-        # Mortgage Specialist: All actions on leads and clients, cases view only
+    UserRole.CHANNEL_OWNER: {
+        Resource.USERS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.CHANNELS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.TEAMS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.LEADS: [Action.VIEW],
+        Resource.CLIENTS: [Action.VIEW],
+        Resource.CASES: [Action.VIEW],
+        Resource.TEMPLATES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.BANK_PRODUCTS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.AUDIT_LOGS: [Action.VIEW],
+    },
+    UserRole.TEAM_LEADER: {
         Resource.LEADS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
         Resource.CLIENTS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
-        Resource.CASES: [Action.VIEW],  # View only - convert to case is a client action
-        Resource.TEMPLATES: [Action.VIEW],
-        # No access to admin resources
+        Resource.CASES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.TEMPLATES: [Action.VIEW, Action.UPDATE],
+        Resource.BANK_PRODUCTS: [Action.VIEW],
+        Resource.TEAMS: [Action.VIEW],
         Resource.USERS: [],
         Resource.CHANNELS: [],
-        Resource.BANK_PRODUCTS: [],
-        Resource.SLA_CONFIG: [],
         Resource.AUDIT_LOGS: [],
     },
-    UserRole.PE: {
-        # Process Executive: All actions on clients and cases, view-only leads
-        Resource.LEADS: [Action.VIEW],  # View only
+    UserRole.MS: {
+        Resource.LEADS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
         Resource.CLIENTS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
-        Resource.CASES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
-        Resource.TEMPLATES: [Action.VIEW],
-        # No access to admin resources
+        Resource.CASES: [Action.VIEW],
+        Resource.TEMPLATES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.BANK_PRODUCTS: [Action.VIEW],
         Resource.USERS: [],
         Resource.CHANNELS: [],
-        Resource.BANK_PRODUCTS: [],
-        Resource.SLA_CONFIG: [],
+        Resource.TEAMS: [],
+        Resource.AUDIT_LOGS: [],
+    },
+    UserRole.PO: {
+        Resource.LEADS: [Action.VIEW],
+        Resource.CLIENTS: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.CASES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.TEMPLATES: [Action.VIEW, Action.CREATE, Action.UPDATE, Action.DELETE],
+        Resource.BANK_PRODUCTS: [Action.VIEW],
+        Resource.USERS: [],
+        Resource.CHANNELS: [],
+        Resource.TEAMS: [],
         Resource.AUDIT_LOGS: [],
     },
 }

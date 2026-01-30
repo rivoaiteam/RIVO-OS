@@ -9,6 +9,8 @@ import {
   useCreateChannel,
   useUpdateChannel,
 } from '@/hooks/useChannels'
+import { api } from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 
 interface ChannelSidePanelProps {
   channelId: string
@@ -22,11 +24,21 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
   const createMutation = useCreateChannel()
   const updateMutation = useUpdateChannel()
 
+  // Fetch channel owners for dropdown
+  const { data: channelOwners = [] } = useQuery({
+    queryKey: ['channel-owners'],
+    queryFn: async () => {
+      const res = await api.get<{ items: { id: string; name: string; role: string }[] }>('/users/', { page_size: 200, status: 'active' })
+      return (res.items || []).filter(u => u.role === 'channel_owner')
+    },
+  })
+
   // Form state
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isTrusted, setIsTrusted] = useState(false)
   const [slaMinutes, setSlaMinutes] = useState('')
+  const [owner, setOwner] = useState('')
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // Populate form when channel data loads
@@ -36,6 +48,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
       setDescription(channel.description || '')
       setIsTrusted(channel.is_trusted)
       setSlaMinutes(channel.default_sla_minutes?.toString() || '')
+      setOwner(channel.owner || '')
     }
   }, [channel])
 
@@ -62,6 +75,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
           description: description.trim(),
           is_trusted: isTrusted,
           default_sla_minutes: slaMinutes ? parseInt(slaMinutes) : null,
+          owner: owner || null,
         })
       } else {
         await updateMutation.mutateAsync({
@@ -71,6 +85,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
             description: description.trim(),
             is_trusted: isTrusted,
             default_sla_minutes: slaMinutes ? parseInt(slaMinutes) : null,
+            owner: owner || null,
           },
         })
       }
@@ -148,6 +163,21 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
             />
           </div>
 
+          {/* Owner */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Channel Owner</label>
+            <select
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] bg-white"
+            >
+              <option value="">Select...</option>
+              {channelOwners.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Type */}
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
@@ -176,7 +206,7 @@ export function ChannelSidePanel({ channelId, onClose }: ChannelSidePanelProps) 
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-100 flex-shrink-0">
+        <div className="p-4 flex-shrink-0">
           <div className="flex gap-2">
             <button
               onClick={onClose}

@@ -14,17 +14,19 @@ from django.db import models
 
 class UserRole(models.TextChoices):
     """
-    Allowed user roles for Rivo OS v1.0.
+    Allowed user roles for Rivo OS.
 
     ADMIN: System configuration. Manages users, channels, bank products, templates.
-    MANAGER: Operations oversight. Sees all clients/cases. Can reassign work.
-    MS: Mortgage Specialist. Works clients to cases. Collects data/docs, creates cases.
-    PE: Process Executive. Works cases to disbursement. Verifies docs, submits to bank.
+    CHANNEL_OWNER: Owns channels, creates teams, assigns members.
+    TEAM_LEADER: Leads a team. Full operational access to leads/clients/cases.
+    MS: Mortgage Specialist. Works leads to clients to cases.
+    PO: Process Executive. Works clients and cases to disbursement.
     """
     ADMIN = 'admin', 'Admin'
-    MANAGER = 'manager', 'Manager'
+    CHANNEL_OWNER = 'channel_owner', 'Channel Owner'
+    TEAM_LEADER = 'team_leader', 'Team Leader'
     MS = 'mortgage_specialist', 'Mortgage Specialist'
-    PE = 'process_executive', 'Process Executive'
+    PO = 'process_officer', 'Process Executive'
 
 
 class User(models.Model):
@@ -127,6 +129,16 @@ class User(models.Model):
     def is_admin(self) -> bool:
         """Check if user has admin role."""
         return self.role == UserRole.ADMIN
+
+    @property
+    def is_channel_owner(self) -> bool:
+        """Check if user has channel owner role."""
+        return self.role == UserRole.CHANNEL_OWNER
+
+    @property
+    def is_team_leader(self) -> bool:
+        """Check if user has team leader role."""
+        return self.role == UserRole.TEAM_LEADER
 
     def set_password(self, password: str) -> None:
         """Hash and set the password."""

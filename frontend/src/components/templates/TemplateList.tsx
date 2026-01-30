@@ -1,5 +1,5 @@
 /**
- * Admin template list page for Settings > Templates.
+ * Template list page for team operators (TL, MS, PO).
  */
 
 import { useState, useEffect } from 'react'
@@ -47,14 +47,12 @@ export function TemplateList() {
   const { data: categories } = useTemplateCategories()
   const deleteMutation = useDeleteTemplate()
 
-  // Apply status filter client-side
   const filteredTemplates = (templates || []).filter(template => {
     if (statusFilter === 'active') return template.is_active
     if (statusFilter === 'inactive') return !template.is_active
     return true
   })
 
-  // Client-side pagination
   const totalItems = filteredTemplates.length
   const totalPages = Math.ceil(totalItems / PAGE_SIZE)
   const paginatedTemplates = filteredTemplates.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
@@ -87,7 +85,6 @@ export function TemplateList() {
 
   return (
     <TablePageLayout>
-      {/* Page Header */}
       <div className="px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
@@ -103,7 +100,6 @@ export function TemplateList() {
           </button>
         </div>
 
-        {/* Filters */}
         <div className="flex items-center gap-4 mt-4">
           <div className="relative w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
@@ -150,18 +146,16 @@ export function TemplateList() {
         <StatusErrorToast message={statusError} onClose={() => setStatusError(null)} />
       )}
 
-      {/* Templates Table */}
       <TableCard>
         <TableContainer isEmpty={paginatedTemplates.length === 0} emptyMessage="No templates found">
           <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="w-[30%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                <th className="w-[15%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
-                <th className="w-[10%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                <th className="w-[15%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
-                <th className="w-[15%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Updated</th>
-                <th className="w-[15%] text-right pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Created</th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Updated</th>
+                <th className="w-12 text-right pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -182,18 +176,6 @@ export function TemplateList() {
                   <td className="py-3">
                     <span className="px-2 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-700">
                       {template.category_display}
-                    </span>
-                  </td>
-                  <td className="py-3">
-                    <span
-                      className={cn(
-                        'px-2 py-0.5 text-xs font-medium rounded',
-                        template.is_active
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
-                      )}
-                    >
-                      {template.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="py-3">
@@ -229,7 +211,6 @@ export function TemplateList() {
         />
       </TableCard>
 
-      {/* Template Side Panel */}
       {selectedTemplateId && (
         <TemplateForm
           template={selectedTemplateId === 'new' ? null : templates?.find(t => t.id === selectedTemplateId)}

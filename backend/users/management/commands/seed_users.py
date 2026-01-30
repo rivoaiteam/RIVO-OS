@@ -19,10 +19,17 @@ class Command(BaseCommand):
                 'password': 'rivo26',
             },
             {
-                'username': 'manager1',
-                'email': 'manager1@rivo.com',
-                'name': 'Mike Manager',
-                'role': UserRole.MANAGER,
+                'username': 'channelowner1',
+                'email': 'channelowner1@rivo.com',
+                'name': 'Chris Owner',
+                'role': UserRole.CHANNEL_OWNER,
+                'password': 'rivo26',
+            },
+            {
+                'username': 'teamlead1',
+                'email': 'teamlead1@rivo.com',
+                'name': 'Tina Leader',
+                'role': UserRole.TEAM_LEADER,
                 'password': 'rivo26',
             },
             {
@@ -33,10 +40,10 @@ class Command(BaseCommand):
                 'password': 'rivo26',
             },
             {
-                'username': 'executive1',
-                'email': 'executive1@rivo.com',
-                'name': 'Eric Executive',
-                'role': UserRole.PE,
+                'username': 'officer1',
+                'email': 'officer1@rivo.com',
+                'name': 'Omar Officer',
+                'role': UserRole.PO,
                 'password': 'rivo26',
             },
             {

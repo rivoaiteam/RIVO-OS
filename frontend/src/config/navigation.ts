@@ -8,15 +8,10 @@ import {
   UserCog,
   Radio,
   FileText,
-  Clock,
-  Megaphone,
-  Building,
   UserCheck,
-  Coins,
-  TrendingUp,
-  Activity,
-  Filter,
-  AlertTriangle,
+  UsersRound,
+  Clock,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -38,33 +33,41 @@ export interface NavSection {
   items: NavItem[]
 }
 
-// Define all navigation items by role
-const adminItems: NavItem[] = [
-  { id: 'users-roles', label: 'Users & Roles', href: '/settings/users', icon: UserCog, roles: ['admin'], section: 'settings' },
-  { id: 'channels', label: 'Channels', href: '/settings/channels', icon: Radio, roles: ['admin'], section: 'settings' },
-  { id: 'bank-products-settings', label: 'Bank Products', href: '/settings/bank-products', icon: Building2, roles: ['admin'], section: 'settings' },
-  { id: 'templates', label: 'Templates', href: '/settings/templates', icon: FileText, roles: ['admin'], section: 'settings' },
-  { id: 'sla-config', label: 'SLA Config', href: '/settings/sla', icon: Clock, roles: ['admin'], section: 'settings' },
+// ── Admin navigation ───────────────────────────────────────
+const adminWorkspace: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin'], section: 'workspace' },
+  { id: 'users-roles', label: 'Users', href: '/users', icon: UserCog, roles: ['admin'], section: 'workspace' },
+  { id: 'channels', label: 'Channels', href: '/channels', icon: Radio, roles: ['admin'], section: 'workspace' },
+  { id: 'teams', label: 'Teams', href: '/teams', icon: UsersRound, roles: ['admin'], section: 'workspace' },
+  { id: 'sla-breaches', label: 'SLA Breaches', href: '/sla-breaches', icon: Clock, roles: ['admin'], section: 'workspace' },
+  { id: 'audit-log', label: 'Audit Log', href: '/audit-log', icon: ScrollText, roles: ['admin'], section: 'workspace' },
 ]
 
-const managerWorkspace: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['manager'], section: 'workspace' },
-  { id: 'leads', label: 'Leads', href: '/leads', icon: Users, roles: ['manager'], section: 'workspace' },
-  { id: 'clients', label: 'Clients', href: '/clients', icon: UserCheck, roles: ['manager'], section: 'workspace' },
-  { id: 'cases', label: 'Cases', href: '/cases', icon: Briefcase, roles: ['manager'], section: 'workspace' },
-  { id: 'campaigns', label: 'Campaigns', href: '/campaigns', icon: Megaphone, roles: ['manager'], section: 'workspace' },
-  { id: 'agencies', label: 'Agencies', href: '/agencies', icon: Building, roles: ['manager'], section: 'workspace' },
-  { id: 'agents', label: 'Agents', href: '/agents', icon: UserCheck, roles: ['manager'], section: 'workspace' },
-  { id: 'commissions', label: 'Commissions', href: '/commissions', icon: Coins, roles: ['manager'], section: 'workspace' },
+// ── Channel Owner navigation ───────────────────────────────
+const channelOwnerWorkspace: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['channel_owner'], section: 'workspace' },
+  { id: 'users-view', label: 'Users', href: '/users', icon: UserCog, roles: ['channel_owner'], section: 'workspace' },
+  { id: 'channels', label: 'Channels', href: '/channels', icon: Radio, roles: ['channel_owner'], section: 'workspace' },
+  { id: 'teams', label: 'Teams', href: '/teams', icon: UsersRound, roles: ['channel_owner'], section: 'workspace' },
+  { id: 'sla-breaches', label: 'SLA Breaches', href: '/sla-breaches', icon: Clock, roles: ['channel_owner'], section: 'workspace' },
+  { id: 'audit-log', label: 'Audit Log', href: '/audit-log', icon: ScrollText, roles: ['channel_owner'], section: 'workspace' },
 ]
 
-const managerAnalytics: NavItem[] = [
-  { id: 'team-performance', label: 'Team Performance', href: '/analytics/team', icon: TrendingUp, roles: ['manager'], section: 'analytics' },
-  { id: 'channel-health', label: 'Channel Health', href: '/analytics/channels', icon: Activity, roles: ['manager'], section: 'analytics' },
-  { id: 'conversion-funnel', label: 'Conversion Funnel', href: '/analytics/funnel', icon: Filter, roles: ['manager'], section: 'analytics' },
-  { id: 'dropoff-analysis', label: 'Drop-off Analysis', href: '/analytics/dropoff', icon: AlertTriangle, roles: ['manager'], section: 'analytics' },
+// ── Team Leader navigation ─────────────────────────────────
+const teamLeaderWorkspace: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['team_leader'], section: 'workspace' },
+  { id: 'leads', label: 'Leads', href: '/leads', icon: Users, roles: ['team_leader'], section: 'workspace' },
+  { id: 'clients', label: 'Clients', href: '/clients', icon: UserCheck, roles: ['team_leader'], section: 'workspace' },
+  { id: 'cases', label: 'Cases', href: '/cases', icon: Briefcase, roles: ['team_leader'], section: 'workspace' },
 ]
 
+const teamLeaderToolbox: NavItem[] = [
+  { id: 'whatsapp', label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, roles: ['team_leader'], section: 'toolbox' },
+  { id: 'bank-products', label: 'Bank Products', href: '/bank-products', icon: Building2, roles: ['team_leader'], section: 'toolbox' },
+  { id: 'templates-toolbox', label: 'Templates', href: '/templates', icon: FileText, roles: ['team_leader'], section: 'toolbox' },
+]
+
+// ── Mortgage Specialist navigation ─────────────────────────
 const mortgageSpecialistWorkspace: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['mortgage_specialist'], section: 'workspace' },
   { id: 'leads', label: 'Leads', href: '/leads', icon: Users, roles: ['mortgage_specialist'], section: 'workspace' },
@@ -78,25 +81,18 @@ const mortgageSpecialistToolbox: NavItem[] = [
   { id: 'templates-toolbox', label: 'Templates', href: '/templates', icon: FileText, roles: ['mortgage_specialist'], section: 'toolbox' },
 ]
 
-const mortgageSpecialistPayouts: NavItem[] = [
-  { id: 'my-commissions', label: 'My Commissions', href: '/payouts/commissions', icon: Coins, roles: ['mortgage_specialist'], section: 'payouts' },
+// ── Process Executive navigation ────────────────────────────
+const processOfficerWorkspace: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['process_officer'], section: 'workspace' },
+  { id: 'leads', label: 'Leads', href: '/leads', icon: Users, roles: ['process_officer'], section: 'workspace' },
+  { id: 'clients', label: 'Clients', href: '/clients', icon: UserCheck, roles: ['process_officer'], section: 'workspace' },
+  { id: 'cases', label: 'Cases', href: '/cases', icon: Briefcase, roles: ['process_officer'], section: 'workspace' },
 ]
 
-const processExecutiveWorkspace: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['process_executive'], section: 'workspace' },
-  { id: 'leads', label: 'Leads', href: '/leads', icon: Users, roles: ['process_executive'], section: 'workspace' },
-  { id: 'clients', label: 'Clients', href: '/clients', icon: UserCheck, roles: ['process_executive'], section: 'workspace' },
-  { id: 'cases', label: 'Cases', href: '/cases', icon: Briefcase, roles: ['process_executive'], section: 'workspace' },
-]
-
-const processExecutiveToolbox: NavItem[] = [
-  { id: 'whatsapp', label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, roles: ['process_executive'], section: 'toolbox' },
-  { id: 'bank-products', label: 'Bank Products', href: '/bank-products', icon: Building2, roles: ['process_executive'], section: 'toolbox' },
-  { id: 'templates-toolbox', label: 'Templates', href: '/templates', icon: FileText, roles: ['process_executive'], section: 'toolbox' },
-]
-
-const processExecutivePayouts: NavItem[] = [
-  { id: 'my-commissions', label: 'My Commissions', href: '/payouts/commissions', icon: Coins, roles: ['process_executive'], section: 'payouts' },
+const processOfficerToolbox: NavItem[] = [
+  { id: 'whatsapp', label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, roles: ['process_officer'], section: 'toolbox' },
+  { id: 'bank-products', label: 'Bank Products', href: '/bank-products', icon: Building2, roles: ['process_officer'], section: 'toolbox' },
+  { id: 'templates-toolbox', label: 'Templates', href: '/templates', icon: FileText, roles: ['process_officer'], section: 'toolbox' },
 ]
 
 export function getNavigationSections(role: UserRole): NavSection[] {
@@ -105,22 +101,30 @@ export function getNavigationSections(role: UserRole): NavSection[] {
   switch (role) {
     case 'admin':
       sections.push({
-        id: 'settings',
-        label: 'SETTINGS',
-        items: adminItems,
+        id: 'workspace',
+        label: 'WORKSPACE',
+        items: adminWorkspace,
       })
       break
 
-    case 'manager':
+    case 'channel_owner':
       sections.push({
         id: 'workspace',
         label: 'WORKSPACE',
-        items: managerWorkspace,
+        items: channelOwnerWorkspace,
+      })
+      break
+
+    case 'team_leader':
+      sections.push({
+        id: 'workspace',
+        label: 'WORKSPACE',
+        items: teamLeaderWorkspace,
       })
       sections.push({
-        id: 'analytics',
-        label: 'ANALYTICS',
-        items: managerAnalytics,
+        id: 'toolbox',
+        label: 'TOOLBOX',
+        items: teamLeaderToolbox,
       })
       break
 
@@ -135,28 +139,18 @@ export function getNavigationSections(role: UserRole): NavSection[] {
         label: 'TOOLBOX',
         items: mortgageSpecialistToolbox,
       })
-      sections.push({
-        id: 'payouts',
-        label: 'PAYOUTS',
-        items: mortgageSpecialistPayouts,
-      })
       break
 
-    case 'process_executive':
+    case 'process_officer':
       sections.push({
         id: 'workspace',
         label: 'WORKSPACE',
-        items: processExecutiveWorkspace,
+        items: processOfficerWorkspace,
       })
       sections.push({
         id: 'toolbox',
         label: 'TOOLBOX',
-        items: processExecutiveToolbox,
-      })
-      sections.push({
-        id: 'payouts',
-        label: 'PAYOUTS',
-        items: processExecutivePayouts,
+        items: processOfficerToolbox,
       })
       break
   }
@@ -164,10 +158,6 @@ export function getNavigationSections(role: UserRole): NavSection[] {
   return sections
 }
 
-export function getSettingsItems(role: UserRole): NavItem[] {
-  // Settings link only shows for admin at the bottom
-  if (role === 'admin') {
-    return []
-  }
+export function getSettingsItems(_role: UserRole): NavItem[] {
   return []
 }

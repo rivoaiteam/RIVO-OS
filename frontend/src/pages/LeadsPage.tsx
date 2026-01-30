@@ -63,7 +63,7 @@ export function LeadsPage() {
     page_size: PAGE_SIZE,
     search: filters.search,
     status: statusFilter,
-    sub_source_id: sourceFilter || undefined,
+    source_id: sourceFilter || undefined,
   })
 
   const leads = data?.items || []
@@ -71,9 +71,9 @@ export function LeadsPage() {
   const totalPages = data?.total_pages || 1
 
   const getSourceDisplay = (lead: LeadListItem) => {
-    if (!lead.sub_source) return '-'
-    const { name, source_name } = lead.sub_source
-    return name && source_name ? `${name} (${source_name})` : name || source_name || '-'
+    if (!lead.source) return '-'
+    const { name, channel_name } = lead.source
+    return name && channel_name ? `${name} (${channel_name})` : name || channel_name || '-'
   }
 
   const getSlaDisplay = (slaDisplay: string | null) => {
@@ -111,7 +111,7 @@ export function LeadsPage() {
             <option value="">All Sources</option>
             {sources?.map((source) => (
               <option key={source.id} value={source.id}>
-                {source.name} ({source.sourceName})
+                {source.name} ({source.channelName})
               </option>
             ))}
           </select>

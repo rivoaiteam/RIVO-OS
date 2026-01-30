@@ -20,7 +20,7 @@ from leads.models import (
     LeadMessageType, LeadMessageStatus
 )
 from leads.constants import TAG_PRIORITY, TAG_TO_STATUS_MAP
-from acquisition_channels.models import SubSource
+from acquisition_channels.models import Source
 
 logger = logging.getLogger(__name__)
 
@@ -73,30 +73,27 @@ class LeadTrackingService:
         return Lead.objects.filter(ycloud_contact_id=ycloud_contact_id).first()
 
     @staticmethod
-    def get_default_campaign_subsource() -> SubSource:
+    def get_default_campaign_source() -> Source:
         """
-        Get or create a default SubSource for campaign leads.
-        This is used when a lead responds but we don't know which campaign.
+        Get or create a default Source for campaign leads.
         """
-        # Try to find existing campaign subsource
-        subsource = SubSource.objects.filter(
+        source = Source.objects.filter(
             name__icontains='whatsapp campaign'
         ).first()
 
-        if subsource:
-            return subsource
+        if source:
+            return source
 
-        # Try to find any subsource from an untrusted channel
-        subsource = SubSource.objects.filter(
-            source__channel__is_trusted=False
+        source = Source.objects.filter(
+            channel__is_trusted=False
         ).first()
 
-        if subsource:
-            return subsource
+        if source:
+            return source
 
         raise ValueError(
-            'No default campaign SubSource configured. '
-            'Please create a SubSource for WhatsApp campaigns from an untrusted channel.'
+            'No default campaign Source configured. '
+            'Please create a Source for WhatsApp campaigns from an untrusted channel.'
         )
 
     @staticmethod
@@ -104,7 +101,7 @@ class LeadTrackingService:
         phone: str,
         name: str = '',
         ycloud_contact_id: str = '',
-        campaign_sub_source_id: str = None
+        campaign_source_id: str = None
     ) -> tuple[Lead, bool]:
         """
         Find existing lead by phone or create new one.
@@ -142,21 +139,21 @@ class LeadTrackingService:
             return existing_lead, False
 
         # Create new lead
-        sub_source = None
-        if campaign_sub_source_id:
+        source = None
+        if campaign_source_id:
             try:
-                sub_source = SubSource.objects.get(id=campaign_sub_source_id)
-            except SubSource.DoesNotExist:
-                logger.warning(f'SubSource not found: {campaign_sub_source_id}')
+                source = Source.objects.get(id=campaign_source_id)
+            except Source.DoesNotExist:
+                logger.warning(f'Source not found: {campaign_source_id}')
 
-        if not sub_source:
-            sub_source = LeadTrackingService.get_default_campaign_subsource()
+        if not source:
+            source = LeadTrackingService.get_default_campaign_source()
 
         # Create lead without calling full_clean (bypass untrusted channel check for webhooks)
         lead = Lead(
             name=name or 'Unknown',
             phone=phone,
-            sub_source=sub_source,
+            source=source,
             ycloud_contact_id=ycloud_contact_id,
             first_response_at=timezone.now(),
             last_response_at=timezone.now(),

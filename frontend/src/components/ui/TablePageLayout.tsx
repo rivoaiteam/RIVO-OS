@@ -108,7 +108,7 @@ interface TableContainerProps {
  */
 export function TableContainer({ children, isEmpty = false, emptyMessage = 'No items found' }: TableContainerProps) {
   return (
-    <div className="flex-1 overflow-y-auto min-h-0">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
       {children}
       {isEmpty && (
         <div className="flex-1 flex items-center justify-center py-16">

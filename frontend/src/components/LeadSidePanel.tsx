@@ -101,9 +101,9 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
   }
 
   const getSourceDisplay = () => {
-    if (!lead?.sub_source) return '-'
-    const { name, source_name } = lead.sub_source
-    return name && source_name ? `${name} (${source_name})` : name || source_name || '-'
+    if (!lead?.source) return '-'
+    const { name, channel_name } = lead.source
+    return name && channel_name ? `${name} (${channel_name})` : name || channel_name || '-'
   }
 
   if (!leadId) return null

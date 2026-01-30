@@ -16,7 +16,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from cases.models import Case, Bank, CaseStage, StageSLAConfig, ClientToCaseSLAConfig, ACTIVE_STAGES, TERMINAL_STAGES, QUERY_STAGES
+from cases.models import Case, Bank, CaseStage, StageSLAConfig, ACTIVE_STAGES, TERMINAL_STAGES, QUERY_STAGES
 from cases.serializers import (
     CaseListSerializer,
     CaseDetailSerializer,
@@ -24,16 +24,11 @@ from cases.serializers import (
     CaseUpdateSerializer,
     StageChangeSerializer,
     BankListSerializer,
-    StageSLAConfigSerializer,
-    StageSLAConfigUpdateSerializer,
-    ClientToCaseSLAConfigSerializer,
-    ClientToCaseSLAConfigUpdateSerializer,
     CaseReassignSerializer,
     SLABreachItemSerializer,
 )
 from clients.models import Client, ClientStatus
-from users.permissions import IsAuthenticated, IsManager, CanAccessCases
-from users.models import User
+from users.permissions import IsAuthenticated, IsChannelOwnerOrAdmin, CanAccessCases
 from audit.models import Note, AuditLog
 
 logger = logging.getLogger(__name__)
@@ -65,16 +60,15 @@ class CaseViewSet(viewsets.ModelViewSet):
     - GET /cases/{id} - Get case details
     - PATCH /cases/{id} - Update case
     - POST /cases/{id}/change_stage - Change case stage
-    - PATCH /cases/{id}/reassign - Reassign case owner (Manager only)
+    - PATCH /cases/{id}/reassign - Reassign case owner (Channel Owner or Admin)
 
     NO destroy action (no delete per spec).
     """
 
     queryset = Case.objects.all().select_related(
         'client',
-        'client__co_applicant',  # For LTV calculations that access co_applicant
+        'client__co_applicant',
         'assigned_to',
-        'bank',  # Prefetch bank for display
     ).order_by('-created_at')
     permission_classes = [IsAuthenticated, CanAccessCases]
     pagination_class = CasePagination
@@ -131,24 +125,34 @@ class CaseViewSet(viewsets.ModelViewSet):
         if client_id:
             queryset = queryset.filter(client_id=client_id)
 
-        # SLA status filter - filter based on stage_sla_status values
+        # SLA status filter - uses DB-level filtering where possible
         sla_status_filter = self.request.query_params.get('sla_status', '').strip()
         if sla_status_filter:
-            matching_ids = []
-            for case in queryset:
-                sla = case.stage_sla_status
-                status = sla.get('status', '')
-                display = sla.get('display', '')
-                is_overdue = status == 'overdue' or 'overdue' in display.lower()
-                is_completed = status == 'completed' or display == 'Completed'
-
-                if sla_status_filter == 'completed' and is_completed:
-                    matching_ids.append(case.id)
-                elif sla_status_filter == 'overdue' and is_overdue:
-                    matching_ids.append(case.id)
-                elif sla_status_filter == 'remaining' and not is_overdue and not is_completed and display:
-                    matching_ids.append(case.id)
-            queryset = queryset.filter(id__in=matching_ids)
+            if sla_status_filter == 'completed':
+                queryset = queryset.filter(
+                    Q(stage__in=TERMINAL_STAGES) | Q(stage=CaseStage.ON_HOLD)
+                )
+            elif sla_status_filter in ('overdue', 'remaining'):
+                # Exclude terminal/on_hold first at DB level
+                active_qs = queryset.exclude(
+                    Q(stage__in=TERMINAL_STAGES) | Q(stage=CaseStage.ON_HOLD)
+                )
+                # Pre-warm SLA config cache, then iterate minimal fields
+                StageSLAConfig.get_sla_for_stage('')
+                now = timezone.now()
+                overdue_ids = []
+                remaining_ids = []
+                for c in active_qs.only('id', 'stage', 'stage_changed_at').iterator():
+                    sla_hours = StageSLAConfig.get_sla_for_stage(c.stage)
+                    if sla_hours is None:
+                        continue
+                    deadline = c.stage_changed_at + timedelta(hours=sla_hours)
+                    if deadline < now:
+                        overdue_ids.append(c.id)
+                    else:
+                        remaining_ids.append(c.id)
+                ids = overdue_ids if sla_status_filter == 'overdue' else remaining_ids
+                queryset = queryset.filter(id__in=ids)
 
         return queryset
 
@@ -309,144 +313,18 @@ class CaseViewSet(viewsets.ModelViewSet):
         serializer = BankListSerializer(banks, many=True)
         return Response(serializer.data)
 
-class StageSLAConfigViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing Stage SLA configurations.
-
-    Admin only. Provides:
-    - GET /stage-sla-configs/ - List all SLA configs
-    - GET /stage-sla-configs/{id}/ - Get single config
-    - PATCH /stage-sla-configs/{id}/ - Update SLA hours
-    - POST /stage-sla-configs/seed/ - Seed default values
-    """
-    queryset = StageSLAConfig.objects.all()
-    serializer_class = StageSLAConfigSerializer
-    permission_classes = [IsAuthenticated]
-    http_method_names = ['get', 'patch', 'post']
-
-    def get_serializer_class(self):
-        if self.action == 'partial_update':
-            return StageSLAConfigUpdateSerializer
-        return StageSLAConfigSerializer
-
-    def list(self, request: Request) -> Response:
-        """
-        List all Stage SLA configurations.
-
-        GET /stage-sla-configs/
-        Returns all SLA configs ordered by stage flow.
-        """
-        # Order by a logical stage order for display
-        stage_order = [
-            'processing',
-            'submitted_to_bank',
-            'under_review',
-            'sales_queries',
-            'submitted_to_credit',
-            'credit_queries',
-            'valuation_initiated',
-            'valuation_report_received',
-            'fol_requested',
-            'fol_received',
-            'fol_signed',
-            'disbursal_queries',
-            'disbursed',
-            'final_documents',
-            'mc_received',
-        ]
-
-        # Get all configs and sort by stage order
-        configs = list(self.queryset.filter(is_active=True))
-        configs.sort(key=lambda c: (
-            stage_order.index(c.from_stage) if c.from_stage in stage_order else 999
-        ))
-
-        serializer = self.get_serializer(configs, many=True)
-        return Response(serializer.data)
-
-    def partial_update(self, request: Request, pk=None) -> Response:
-        """
-        Update SLA hours for a config.
-
-        PATCH /stage-sla-configs/{id}/
-        Body: { sla_hours: number }
-        """
-        config = self.get_object()
-        serializer = self.get_serializer(config, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(StageSLAConfigSerializer(config).data)
-
-    @action(detail=False, methods=['post'])
-    def seed(self, request: Request) -> Response:
-        """
-        Seed/reset default SLA configurations.
-
-        POST /stage-sla-configs/seed/
-        Resets all SLA configs to default values.
-        """
-        StageSLAConfig.seed_defaults()
-        configs = StageSLAConfig.objects.filter(is_active=True)
-        serializer = StageSLAConfigSerializer(configs, many=True)
-        return Response({
-            'message': f'Seeded {configs.count()} SLA configurations',
-            'items': serializer.data
-        })
-
-
-class ClientToCaseSLAConfigViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing Client to Case SLA configuration.
-
-    Provides:
-    - GET /client-to-case-sla/ - Get the config (single record)
-    - PATCH /client-to-case-sla/{id}/ - Update SLA hours and breach percent
-    """
-    queryset = ClientToCaseSLAConfig.objects.all()
-    serializer_class = ClientToCaseSLAConfigSerializer
-    permission_classes = [IsAuthenticated]
-    http_method_names = ['get', 'patch']
-
-    def get_serializer_class(self):
-        if self.action == 'partial_update':
-            return ClientToCaseSLAConfigUpdateSerializer
-        return ClientToCaseSLAConfigSerializer
-
-    def list(self, request: Request) -> Response:
-        """
-        Get Client to Case SLA configuration.
-        Auto-creates if not exists with default values.
-        """
-        config = ClientToCaseSLAConfig.get_config()
-        serializer = self.get_serializer(config)
-        return Response(serializer.data)
-
-    def partial_update(self, request: Request, pk=None) -> Response:
-        """
-        Update Client to Case SLA config.
-
-        PATCH /client-to-case-sla/{id}/
-        Body: { sla_hours: number, breach_percent: number }
-        """
-        config = self.get_object()
-        serializer = self.get_serializer(config, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(ClientToCaseSLAConfigSerializer(config).data)
-
-
 class SLABreachesView(APIView):
     """
     API view for listing all SLA breaches.
 
-    Manager-only endpoint that returns all breached SLAs across:
+    Channel Owner or Admin endpoint that returns all breached SLAs across:
     - First Contact SLA (Clients)
     - Client-to-Case SLA (Clients with first contact completed)
     - Stage SLA (Cases)
 
     GET /sla-breaches/?sla_type=all&owner=all
     """
-    permission_classes = [IsManager]
+    permission_classes = [IsChannelOwnerOrAdmin]
 
     def get(self, request: Request) -> Response:
         """
@@ -538,7 +416,7 @@ class SLABreachesView(APIView):
         queryset = Client.objects.filter(
             status=ClientStatus.ACTIVE,
             first_contact_completed_at__isnull=True,
-        ).select_related('sub_source__source__channel', 'assigned_to')
+        ).select_related('source__channel', 'assigned_to')
 
         if owner_id:
             queryset = queryset.filter(assigned_to_id=owner_id)

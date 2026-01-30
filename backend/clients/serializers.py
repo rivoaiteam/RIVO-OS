@@ -23,22 +23,21 @@ from clients.models import (
     TransactionType,
     MaritalStatus,
 )
-from acquisition_channels.models import SubSource
+from acquisition_channels.models import Source
 
 
-class SubSourceNestedSerializer(serializers.ModelSerializer):
-    """Nested serializer for sub-source in client responses."""
-    source_name = serializers.CharField(source='source.name', read_only=True)
-    channel_name = serializers.CharField(source='source.channel.name', read_only=True)
+class SourceNestedSerializer(serializers.ModelSerializer):
+    """Nested serializer for source in client responses."""
+    channel_name = serializers.CharField(source='channel.name', read_only=True)
     channel_is_trusted = serializers.BooleanField(
-        source='source.channel.is_trusted', read_only=True
+        source='channel.is_trusted', read_only=True
     )
     effective_sla = serializers.IntegerField(source='effective_sla_minutes', read_only=True)
 
     class Meta:
-        model = SubSource
+        model = Source
         fields = [
-            'id', 'name', 'source_name', 'channel_name', 'channel_is_trusted', 'effective_sla'
+            'id', 'name', 'channel_name', 'channel_is_trusted', 'effective_sla'
         ]
 
 
@@ -112,7 +111,7 @@ class ClientListSerializer(serializers.ModelSerializer):
 
     Returns summary fields for table display.
     """
-    sub_source = SubSourceNestedSerializer(read_only=True)
+    source = SourceNestedSerializer(read_only=True)
     dbr_percentage = serializers.DecimalField(
         max_digits=5, decimal_places=2, read_only=True
     )
@@ -128,7 +127,7 @@ class ClientListSerializer(serializers.ModelSerializer):
             'id', 'name', 'phone', 'email', 'status',
             'application_type', 'dbr_percentage',
             'property_value', 'loan_amount', 'ltv_status',
-            'sub_source', 'sla_display', 'active_case_id',
+            'source', 'sla_display', 'active_case_id',
             'first_contact_sla_status', 'client_to_case_sla_status',
             'created_at', 'updated_at',
         ]
@@ -185,7 +184,7 @@ class ClientDetailSerializer(serializers.ModelSerializer):
     Returns all fields plus computed DBR, max_loan, LTV, can_create_case,
     and SLA status fields for countdown display.
     """
-    sub_source = SubSourceNestedSerializer(read_only=True)
+    source = SourceNestedSerializer(read_only=True)
     co_applicant = CoApplicantSerializer(read_only=True)
     extra_details = serializers.SerializerMethodField()
 
@@ -238,7 +237,7 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             # Intent
             'notes', 'timeline',
             # Status & Source
-            'status', 'sub_source', 'converted_from_lead',
+            'status', 'source', 'converted_from_lead',
             # Co-applicant
             'co_applicant',
             # Extra Details
@@ -304,11 +303,14 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             return None
 
     def get_cases(self, obj: Client) -> list[dict] | None:
-        """Get list of cases linked to this client."""
-        from cases.models import Case, CaseStage
-        cases = Case.objects.filter(client=obj).exclude(
-            stage__in=[CaseStage.REJECTED, CaseStage.NOT_PROCEEDING]
-        ).order_by('-created_at')
+        """Get list of cases linked to this client (uses prefetched data)."""
+        from cases.models import CaseStage
+        excluded = {CaseStage.REJECTED, CaseStage.NOT_PROCEEDING}
+        cases = [
+            c for c in obj.cases.all()
+            if c.stage not in excluded
+        ]
+        cases.sort(key=lambda c: c.created_at, reverse=True)
 
         if not cases:
             return None
@@ -330,7 +332,7 @@ class ClientCreateSerializer(serializers.ModelSerializer):
 
     Accepts all writable fields. Validates trusted channel or lead conversion.
     """
-    sub_source_id = serializers.UUIDField(write_only=True)
+    source_id = serializers.UUIDField(write_only=True)
     lead_id = serializers.UUIDField(
         write_only=True, required=False, allow_null=True,
         help_text='Lead ID for conversion (allows untrusted channel)'
@@ -358,39 +360,37 @@ class ClientCreateSerializer(serializers.ModelSerializer):
             # Intent
             'notes', 'timeline',
             # Source
-            'sub_source_id', 'lead_id',
+            'source_id', 'lead_id',
         ]
 
     def validate(self, attrs):
-        """Validate sub_source belongs to trusted channel or lead is provided."""
-        sub_source_id = attrs.get('sub_source_id')
+        """Validate source belongs to trusted channel or lead is provided."""
+        source_id = attrs.get('source_id')
         lead_id = attrs.get('lead_id')
 
         try:
-            sub_source = SubSource.objects.select_related(
-                'source__channel'
-            ).get(pk=sub_source_id)
-        except SubSource.DoesNotExist:
+            source = Source.objects.select_related(
+                'channel'
+            ).get(pk=source_id)
+        except Source.DoesNotExist:
             raise serializers.ValidationError({
-                'sub_source_id': 'Invalid sub_source_id.'
+                'source_id': 'Invalid source_id.'
             })
 
-        # Check if channel is trusted or lead is provided for conversion
-        if not sub_source.source.channel.is_trusted and not lead_id:
+        if not source.channel.is_trusted and not lead_id:
             raise serializers.ValidationError({
-                'sub_source_id': 'Clients can only be created from trusted channels. '
-                                 'Provide lead_id for conversion from untrusted channel.'
+                'source_id': 'Clients can only be created from trusted channels. '
+                             'Provide lead_id for conversion from untrusted channel.'
             })
 
-        attrs['sub_source'] = sub_source
+        attrs['source'] = source
         return attrs
 
     def create(self, validated_data):
-        """Create client with sub_source and optional lead conversion."""
-        sub_source = validated_data.pop('sub_source')
+        """Create client with source and optional lead conversion."""
+        source = validated_data.pop('source')
         lead_id = validated_data.pop('lead_id', None)
 
-        # Handle lead conversion
         converted_from_lead = None
         if lead_id:
             from leads.models import Lead
@@ -402,10 +402,10 @@ class ClientCreateSerializer(serializers.ModelSerializer):
                     'lead_id': 'Lead not found.'
                 })
 
-        validated_data.pop('sub_source_id', None)
+        validated_data.pop('source_id', None)
 
         client = Client(
-            sub_source=sub_source,
+            source=source,
             converted_from_lead=converted_from_lead,
             **validated_data
         )

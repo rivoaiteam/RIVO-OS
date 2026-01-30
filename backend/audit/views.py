@@ -487,6 +487,35 @@ class AdminAuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
     pagination_class = AuditLogPagination
 
+    def get_serializer_context(self):
+        """Add user_map to serializer context to avoid N+1 on user lookups."""
+        context = super().get_serializer_context()
+        # Build user map from paginated page (called after pagination)
+        if hasattr(self, '_user_map'):
+            context['user_map'] = self._user_map
+        return context
+
+    def list(self, request, *args, **kwargs):
+        """Override list to batch-fetch user names."""
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        items = page if page is not None else queryset
+
+        # Batch-fetch all user names for this page
+        user_ids = {item.user_id for item in items if item.user_id}
+        if user_ids:
+            from users.models import User
+            self._user_map = dict(
+                User.objects.filter(pk__in=user_ids).values_list('id', 'name')
+            )
+        else:
+            self._user_map = {}
+
+        serializer = self.get_serializer(items, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
     def get_queryset(self):
         """Filter audit logs based on query parameters."""
         queryset = AuditLog.objects.all().order_by('-timestamp')

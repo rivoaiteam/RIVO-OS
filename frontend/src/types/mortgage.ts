@@ -111,12 +111,11 @@ export interface LtvStatusData {
 
 // Nested Types for API responses
 
-export interface SubSourceSummary {
+export interface SourceSummary {
   id: string
   name: string
-  source_name: string
   channel_name: string
-  is_trusted: boolean
+  channel_is_trusted?: boolean
   effective_sla: number | null
 }
 
@@ -135,7 +134,7 @@ export interface LeadListItem {
   phone: string
   email: string | null
   status: LeadStatus
-  sub_source: SubSourceSummary
+  source: SourceSummary
   sla_display: string | null
   // Campaign tracking fields
   campaign_status: CampaignStatus
@@ -153,7 +152,7 @@ export interface LeadData {
   name: string
   phone: string
   email: string | null
-  sub_source: SubSourceSummary
+  source: SourceSummary
   intent: string | null
   status: LeadStatus
   converted_client: string | null
@@ -226,7 +225,7 @@ export interface CreateLeadData {
   name: string
   phone: string
   email?: string
-  sub_source_id: string
+  source_id: string
   intent?: string
 }
 
@@ -281,7 +280,7 @@ export interface ClientListItem {
   property_value: string | null
   loan_amount: string | null
   ltv_status: LtvStatusData | null
-  sub_source: SubSourceSummary
+  source: SourceSummary
   sla_display: string | null
   active_case_id: ClientCaseSummary[] | null
   created_at: string
@@ -335,7 +334,7 @@ export interface ClientData {
   timeline: Timeline | null
   // Status & Source
   status: ClientStatus
-  sub_source: SubSourceSummary
+  source: SourceSummary
   converted_from_lead: string | null
   // Co-Applicant (for joint applications)
   co_applicant: CoApplicantData | null
@@ -411,7 +410,7 @@ export interface CreateClientData {
   notes?: string
   timeline?: Timeline
   // Source
-  sub_source_id: string
+  source_id: string
   // Or converted from lead
   converted_from_lead_id?: string
 }
@@ -677,7 +676,7 @@ export interface LeadsQueryParams {
   page_size?: number
   search?: string
   status?: LeadStatus | 'all'
-  sub_source_id?: string
+  source_id?: string
   campaign_status?: CampaignStatus | 'all'
 }
 
@@ -687,7 +686,7 @@ export interface ClientsQueryParams {
   search?: string
   status?: ClientStatus | 'all'
   application_type?: ApplicationType | 'all'
-  sub_source_id?: string
+  source_id?: string
   sla_status?: string
 }
 

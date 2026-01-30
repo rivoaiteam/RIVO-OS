@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check, Loader2, Building2 } from 'lucide-react'
 import { useDashboardReminders, useCompleteReminder } from '@/hooks/useAudit'
 import { ClientSidePanel } from '@/components/ClientSidePanel'
 import { CaseSidePanel } from '@/components/CaseSidePanel'
@@ -71,13 +71,14 @@ export function DashboardPage() {
 
       <TableCard>
         <TableContainer isEmpty={!reminders?.length} emptyMessage="No reminders">
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="w-[35%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Client</th>
-                <th className="w-[40%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Note</th>
-                <th className="w-[20%] text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Due</th>
-                <th className="w-[5%] text-left pb-3"></th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Client</th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Case</th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Note</th>
+                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Due</th>
+                <th className="w-12 text-left pb-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -88,7 +89,17 @@ export function DashboardPage() {
                   className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors cursor-pointer"
                 >
                   <td className="py-3">
-                    <span className="text-xs font-medium text-gray-900">{reminder.notable_name}</span>
+                    <span className="text-xs font-medium text-gray-900">{reminder.client_name ?? reminder.notable_name}</span>
+                  </td>
+                  <td className="py-3">
+                    {reminder.case_bank ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                        <Building2 className="h-3 w-3 text-gray-400" />
+                        {reminder.case_bank}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-300">{'\u2014'}</span>
+                    )}
                   </td>
                   <td className="py-3">
                     <span className="text-xs text-gray-600 truncate block">{reminder.note_text}</span>

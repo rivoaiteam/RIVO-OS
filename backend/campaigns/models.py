@@ -32,14 +32,14 @@ class Campaign(models.Model):
         help_text='YCloud campaign ID for reference'
     )
 
-    # Sub-source for attribution (links to acquisition channel)
-    sub_source = models.ForeignKey(
-        'acquisition_channels.SubSource',
+    # Source for attribution (links to acquisition channel)
+    source = models.ForeignKey(
+        'acquisition_channels.Source',
         on_delete=models.PROTECT,
         related_name='campaigns',
         null=True,
         blank=True,
-        help_text='Attribution sub-source for leads from this campaign'
+        help_text='Attribution source for leads from this campaign'
     )
 
     # Auto-discovery tracking

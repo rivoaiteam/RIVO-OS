@@ -13,7 +13,7 @@ from django.db import models
 from django.utils import timezone
 
 from audit.models import AuditableModel
-from acquisition_channels.models import SubSource
+from acquisition_channels.models import Source
 from common.sla import format_sla_duration
 
 
@@ -81,11 +81,11 @@ class Lead(AuditableModel):
         help_text='Email address (optional)'
     )
 
-    sub_source = models.ForeignKey(
-        SubSource,
+    source = models.ForeignKey(
+        Source,
         on_delete=models.PROTECT,
         related_name='leads',
-        help_text='Sub-source this lead came from (must be untrusted channel)'
+        help_text='Source this lead came from (must be untrusted channel)'
     )
 
     intent = models.TextField(
@@ -165,7 +165,7 @@ class Lead(AuditableModel):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status'], name='leads_status_idx'),
-            models.Index(fields=['sub_source'], name='leads_sub_source_idx'),
+            models.Index(fields=['source'], name='leads_source_idx'),
             models.Index(fields=['created_at'], name='leads_created_at_idx'),
             models.Index(fields=['campaign_status'], name='leads_campaign_status_idx'),
             models.Index(fields=['ycloud_contact_id'], name='leads_ycloud_contact_idx'),
@@ -184,18 +184,18 @@ class Lead(AuditableModel):
                 'status': f'Invalid status. Must be one of: {", ".join(LeadStatus.values)}'
             })
 
-        # Validate sub_source belongs to an untrusted channel
-        if self.sub_source_id:
+        # Validate source belongs to an untrusted channel
+        if self.source_id:
             try:
-                sub_source = self.sub_source
-                if sub_source.source.channel.is_trusted:
+                source = self.source
+                if source.channel.is_trusted:
                     raise ValidationError({
-                        'sub_source': 'Leads can only be created from untrusted channels. '
-                                     f'Channel "{sub_source.source.channel.name}" is trusted.'
+                        'source': 'Leads can only be created from untrusted channels. '
+                                 f'Channel "{source.channel.name}" is trusted.'
                     })
-            except SubSource.DoesNotExist:
+            except Source.DoesNotExist:
                 raise ValidationError({
-                    'sub_source': 'Sub-source does not exist.'
+                    'source': 'Source does not exist.'
                 })
 
     def save(self, *args, **kwargs) -> None:
@@ -206,8 +206,8 @@ class Lead(AuditableModel):
     @property
     def sla_minutes(self) -> int | None:
         """Get effective SLA in minutes from the channel cascade."""
-        if self.sub_source:
-            return self.sub_source.effective_sla_minutes
+        if self.source:
+            return self.source.effective_sla_minutes
         return None
 
     @property

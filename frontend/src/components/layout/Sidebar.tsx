@@ -18,9 +18,9 @@ export function Sidebar() {
   } = useLayout()
   const { sections, settingsItems } = useNavigationItems()
 
-  // Only fetch breach count for managers (those who can view audit logs / oversight)
+  // Only fetch breach count for channel owners and admins (those with oversight)
   const { data: breachCount } = useSLABreachCount()
-  const isManager = user?.role === 'manager'
+  const isOversightRole = user?.role === 'channel_owner' || user?.role === 'admin'
 
   const isActive = (href: string) => location.pathname === href || location.pathname.startsWith(href + '/')
 
@@ -87,8 +87,8 @@ export function Sidebar() {
                 {section.items.map(item => {
                   const Icon = item.icon
                   const active = isActive(item.href)
-                  // Show badge count for SLA Breaches item if manager and has breaches
-                  const showBadge = isManager && item.showBadge && breachCount && breachCount > 0
+                  // Show badge count for SLA Breaches if oversight role and has breaches
+                  const showBadge = isOversightRole && item.showBadge && breachCount && breachCount > 0
 
                   return (
                     <Link

@@ -144,7 +144,7 @@ export function ClientsPage() {
     page_size: PAGE_SIZE,
     search: searchQuery,
     status: statusFilter,
-    sub_source_id: sourceFilter || undefined,
+    source_id: sourceFilter || undefined,
   })
 
   const clients = data?.items || []
@@ -189,7 +189,7 @@ export function ClientsPage() {
           >
             <option value="">All Sources</option>
             {sources?.map((source) => (
-              <option key={source.id} value={source.id}>{source.name} ({source.sourceName})</option>
+              <option key={source.id} value={source.id}>{source.name} ({source.channelName})</option>
             ))}
           </select>
         </div>
@@ -234,7 +234,7 @@ export function ClientsPage() {
                     </td>
                     <td className="py-3">
                       <span className="text-xs text-gray-500 truncate block max-w-[180px]">
-                        {client.sub_source ? `${client.sub_source.name} (${client.sub_source.source_name})` : '-'}
+                        {client.source ? `${client.source.name} (${client.source.channel_name})` : '-'}
                       </span>
                     </td>
                     <td className="py-3">

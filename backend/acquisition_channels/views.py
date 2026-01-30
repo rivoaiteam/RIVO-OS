@@ -1,6 +1,6 @@
 """
-API views for Channel, Source, and Sub-source management.
-Admin-only access for all operations.
+API views for Channel and Source management.
+Admin-only access for most operations.
 """
 
 import logging
@@ -8,21 +8,20 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from acquisition_channels.models import Channel, Source, SubSource
+from acquisition_channels.models import Channel, Source, Team
 from acquisition_channels.serializers import (
     ChannelSerializer,
     ChannelListSerializer,
     ChannelCreateSerializer,
     ChannelUpdateSerializer,
     SourceSerializer,
-    SourceListSerializer,
     SourceCreateSerializer,
-    SubSourceSerializer,
-    SubSourceCreateSerializer,
     MSUserSerializer,
+    TeamSerializer,
+    TeamCreateUpdateSerializer,
 )
-from users.models import User
-from users.permissions import IsAdminRole, IsAuthenticated
+from users.models import User, UserRole
+from users.permissions import IsAdminRole, IsAuthenticated, IsChannelOwnerOrAdmin
 
 logger = logging.getLogger(__name__)
 
@@ -30,18 +29,18 @@ logger = logging.getLogger(__name__)
 class ChannelViewSet(viewsets.ModelViewSet):
     """
     ViewSet for channel management.
-
-    GET /channels - List all channels (Authenticated users)
-    POST /channels - Create channel (Admin only)
-    GET /channels/{id} - Get channel with sources and sub-sources (Authenticated users)
-    PATCH /channels/{id} - Update channel (Admin only)
-    DELETE /channels/{id} - Delete channel (Admin only)
     """
 
     queryset = Channel.objects.all().order_by('name')
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        if user.role == UserRole.CHANNEL_OWNER:
+            return queryset.filter(owner=user)
+        return queryset
+
     def get_permissions(self):
-        """Allow read access to all authenticated users, write access to admins only."""
         if self.action in ['list', 'retrieve']:
             return [IsAuthenticated()]
         return [IsAdminRole()]
@@ -56,7 +55,6 @@ class ChannelViewSet(viewsets.ModelViewSet):
         return ChannelSerializer
 
     def retrieve(self, request, pk=None):
-        """Get channel with all sources and sub-sources."""
         channel = self.get_object()
         serializer = ChannelSerializer(channel)
         return Response(serializer.data)
@@ -70,7 +68,10 @@ class ChannelViewSet(viewsets.ModelViewSet):
 
         source = Source.objects.create(
             channel=channel,
-            name=serializer.validated_data['name']
+            name=serializer.validated_data['name'],
+            sla_minutes=serializer.validated_data.get('sla_minutes'),
+            status=serializer.validated_data.get('status', 'active'),
+            linked_user=serializer.validated_data.get('linked_user'),
         )
         return Response(
             SourceSerializer(source).data,
@@ -80,89 +81,78 @@ class ChannelViewSet(viewsets.ModelViewSet):
 
 class SourceViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for source management (Admin only).
-
-    GET /sources - List all sources
-    GET /sources/{id} - Get source with sub-sources
-    PATCH /sources/{id} - Update source
-    DELETE /sources/{id} - Delete source
-    POST /sources/{id}/add_sub_source - Add sub-source
+    ViewSet for source management.
     """
 
-    queryset = Source.objects.all().select_related('channel').prefetch_related('sub_sources')
-    permission_classes = [IsAdminRole]
+    queryset = Source.objects.all().select_related('channel', 'linked_user')
+
+    def get_permissions(self):
+        if self.action in ['for_filter', 'ms_users']:
+            return [IsAuthenticated()]
+        return [IsAdminRole()]
 
     def get_serializer_class(self):
-        if self.action == 'list':
-            return SourceListSerializer
         return SourceSerializer
 
+    def destroy(self, request, pk=None):
+        source = self.get_object()
+        lead_count = source.leads.count() if hasattr(source, 'leads') else 0
+        client_count = source.clients.count() if hasattr(source, 'clients') else 0
+        if lead_count or client_count:
+            return Response(
+                {'error': 'Cannot delete source.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        source.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def partial_update(self, request, pk=None):
-        """Update source name, SLA, or status."""
+        """Update source name, SLA, status, or linked_user."""
         source = self.get_object()
         source.name = request.data.get('name', source.name)
-        source.is_active = request.data.get('is_active', source.is_active)
+        source.status = request.data.get('status', source.status)
 
-        # Handle sla_minutes - can be set to null to inherit from channel
         if 'sla_minutes' in request.data:
             source.sla_minutes = request.data.get('sla_minutes')
+
+        if 'linked_user' in request.data:
+            source.linked_user_id = request.data.get('linked_user')
 
         source.save()
         return Response(SourceSerializer(source).data)
 
-    @action(detail=True, methods=['post'])
-    def add_sub_source(self, request, pk=None):
-        """Add a sub-source to this source."""
-        source = self.get_object()
-        serializer = SubSourceCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    @action(detail=False, methods=['get'])
+    def for_filter(self, request):
+        """
+        Get sources for filter dropdowns.
 
-        sub_source = SubSource.objects.create(
-            source=source,
-            name=serializer.validated_data['name'],
-            sla_minutes=serializer.validated_data.get('sla_minutes'),
-            linked_user=serializer.validated_data.get('linked_user'),
-            status=serializer.validated_data.get('status', 'active')
-        )
-        return Response(
-            SubSourceSerializer(sub_source).data,
-            status=status.HTTP_201_CREATED
-        )
+        Query params:
+        - trust: 'trusted', 'untrusted', or 'all' (default: 'all')
+        """
+        trust_filter = request.query_params.get('trust', 'all')
 
+        queryset = Source.objects.select_related(
+            'channel'
+        ).filter(
+            status='active',
+            channel__is_active=True
+        ).order_by('channel__name', 'name')
 
-class SubSourceViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for sub-source management (Admin only).
+        if trust_filter == 'trusted':
+            queryset = queryset.filter(channel__is_trusted=True)
+        elif trust_filter == 'untrusted':
+            queryset = queryset.filter(channel__is_trusted=False)
 
-    GET /sub-sources/{id} - Get sub-source details
-    PATCH /sub-sources/{id} - Update sub-source
-    DELETE /sub-sources/{id} - Delete sub-source
-    """
+        result = []
+        for source in queryset:
+            result.append({
+                'id': str(source.id),
+                'name': source.name,
+                'channel_name': source.channel.name,
+                'is_trusted': source.channel.is_trusted,
+            })
 
-    queryset = SubSource.objects.all().select_related('source__channel', 'linked_user')
-    serializer_class = SubSourceSerializer
-
-    def get_permissions(self):
-        """Allow ms_users and for_filter for all authenticated users, rest admin only."""
-        if self.action in ['ms_users', 'for_filter']:
-            return [IsAuthenticated()]
-        return [IsAdminRole()]
-
-    def partial_update(self, request, pk=None):
-        """Update sub-source."""
-        sub_source = self.get_object()
-        sub_source.name = request.data.get('name', sub_source.name)
-        sub_source.status = request.data.get('status', sub_source.status)
-
-        # Handle sla_minutes - can be set to null to inherit from source/channel
-        if 'sla_minutes' in request.data:
-            sub_source.sla_minutes = request.data.get('sla_minutes')
-
-        if 'linked_user' in request.data:
-            sub_source.linked_user_id = request.data.get('linked_user')
-
-        sub_source.save()
-        return Response(SubSourceSerializer(sub_source).data)
+        return Response(result)
 
     @action(detail=False, methods=['get'])
     def ms_users(self, request):
@@ -171,44 +161,103 @@ class SubSourceViewSet(viewsets.ModelViewSet):
             role='mortgage_specialist',
             is_active=True
         ).exclude(
-            linked_sub_sources__isnull=False
+            linked_sources__isnull=False
         )
         serializer = MSUserSerializer(ms_users, many=True)
         return Response(serializer.data)
 
+
+class TeamViewSet(viewsets.ModelViewSet):
+    """ViewSet for team management."""
+    queryset = Team.objects.all().select_related(
+        'channel', 'team_leader', 'mortgage_specialist', 'process_officer'
+    ).order_by('name')
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return TeamCreateUpdateSerializer
+        return TeamSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        user = self.request.user
+        # Admin sees all teams
+        if user.role == UserRole.ADMIN:
+            return queryset
+        # Channel Owner sees only their channels' teams
+        if user.role == UserRole.CHANNEL_OWNER:
+            return queryset.filter(channel__owner=user)
+        # TL/MS/PO see their own team only
+        from django.db.models import Q
+        return queryset.filter(
+            Q(team_leader=user) | Q(mortgage_specialist=user) | Q(process_officer=user)
+        )
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve', 'org_chart']:
+            return [IsAuthenticated()]
+        return [IsChannelOwnerOrAdmin()]
+
     @action(detail=False, methods=['get'])
-    def for_filter(self, request):
-        """
-        Get sub-sources for filter dropdowns.
+    def org_chart(self, request):
+        """Return org chart tree: owner -> channels -> teams -> members."""
+        from django.db.models import Q, Prefetch
 
-        Query params:
-        - trust: 'trusted', 'untrusted', or 'all' (default: 'all')
+        user = request.user
+        teams_prefetch = Prefetch(
+            'teams',
+            queryset=Team.objects.select_related(
+                'team_leader', 'mortgage_specialist', 'process_officer'
+            )
+        )
 
-        Returns flat list of sub-sources with source and channel info.
-        """
-        trust_filter = request.query_params.get('trust', 'all')
+        if user.role == UserRole.ADMIN:
+            channels = Channel.objects.all().select_related('owner').prefetch_related(teams_prefetch)
+        elif user.role == UserRole.CHANNEL_OWNER:
+            channels = Channel.objects.filter(owner=user).select_related('owner').prefetch_related(teams_prefetch)
+        else:
+            team_qs = Team.objects.filter(
+                Q(team_leader=user) | Q(mortgage_specialist=user) | Q(process_officer=user)
+            ).select_related('channel')
+            channel_ids = team_qs.values_list('channel_id', flat=True).distinct()
+            channels = Channel.objects.filter(id__in=channel_ids).select_related('owner').prefetch_related(teams_prefetch)
 
-        queryset = SubSource.objects.select_related(
-            'source__channel'
-        ).filter(
-            source__is_active=True,
-            source__channel__is_active=True
-        ).order_by('source__channel__name', 'source__name', 'name')
+        # Group channels by owner
+        owners_map = {}
+        unowned = []
+        for channel in channels:
+            channel_data = {
+                'id': str(channel.id),
+                'name': channel.name,
+                'teams': [],
+            }
+            for team in channel.teams.filter(is_active=True):
+                channel_data['teams'].append({
+                    'id': str(team.id),
+                    'name': team.name,
+                    'team_leader': {'id': str(team.team_leader.id), 'name': team.team_leader.name} if team.team_leader else None,
+                    'mortgage_specialist': {'id': str(team.mortgage_specialist.id), 'name': team.mortgage_specialist.name} if team.mortgage_specialist else None,
+                    'process_officer': {'id': str(team.process_officer.id), 'name': team.process_officer.name} if team.process_officer else None,
+                })
+            if channel.owner:
+                owner_id = str(channel.owner.id)
+                if owner_id not in owners_map:
+                    owners_map[owner_id] = {
+                        'id': owner_id,
+                        'name': channel.owner.name,
+                        'channels': [],
+                    }
+                owners_map[owner_id]['channels'].append(channel_data)
+            else:
+                unowned.append(channel_data)
 
-        if trust_filter == 'trusted':
-            queryset = queryset.filter(source__channel__is_trusted=True)
-        elif trust_filter == 'untrusted':
-            queryset = queryset.filter(source__channel__is_trusted=False)
-
-        result = []
-        for sub_source in queryset:
+        result = list(owners_map.values())
+        if unowned:
             result.append({
-                'id': str(sub_source.id),
-                'name': sub_source.name,
-                'source_name': sub_source.source.name,
-                'channel_name': sub_source.source.channel.name,
-                'is_trusted': sub_source.source.channel.is_trusted,
+                'id': None,
+                'name': 'Unassigned',
+                'channels': unowned,
             })
 
         return Response(result)
-

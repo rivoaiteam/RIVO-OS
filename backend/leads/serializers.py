@@ -7,30 +7,29 @@ and status management.
 
 from rest_framework import serializers
 
-from acquisition_channels.models import SubSource
+from acquisition_channels.models import Source
 from leads.models import Lead, LeadStatus, CampaignStatus, LeadInteraction, LeadMessage
 
 
-class SubSourceNestedSerializer(serializers.ModelSerializer):
-    """Nested serializer for sub-source in lead responses."""
-    source_name = serializers.CharField(source='source.name', read_only=True)
-    channel_name = serializers.CharField(source='source.channel.name', read_only=True)
+class SourceNestedSerializer(serializers.ModelSerializer):
+    """Nested serializer for source in lead responses."""
+    channel_name = serializers.CharField(source='channel.name', read_only=True)
     effective_sla = serializers.IntegerField(source='effective_sla_minutes', read_only=True)
 
     class Meta:
-        model = SubSource
-        fields = ['id', 'name', 'source_name', 'channel_name', 'effective_sla']
+        model = Source
+        fields = ['id', 'name', 'channel_name', 'effective_sla']
 
 
 class LeadListSerializer(serializers.ModelSerializer):
     """
     Serializer for listing leads.
 
-    Returns: id, name, phone, email, status, sub_source (nested), sla_display,
+    Returns: id, name, phone, email, status, source (nested), sla_display,
              campaign_status, campaign_status_display, current_tags, response_count,
              first_response_at, last_response_at, created_at, updated_at
     """
-    sub_source = SubSourceNestedSerializer(read_only=True)
+    source = SourceNestedSerializer(read_only=True)
     sla_display = serializers.SerializerMethodField()
     campaign_status_display = serializers.CharField(source='get_campaign_status_display', read_only=True)
 
@@ -38,7 +37,7 @@ class LeadListSerializer(serializers.ModelSerializer):
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'status',
-            'sub_source', 'sla_display',
+            'source', 'sla_display',
             # Campaign tracking fields
             'campaign_status', 'campaign_status_display', 'current_tags',
             'response_count', 'first_response_at', 'last_response_at',
@@ -57,7 +56,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
 
     Returns all lead fields plus computed sla_timer and campaign tracking.
     """
-    sub_source = SubSourceNestedSerializer(read_only=True)
+    source = SourceNestedSerializer(read_only=True)
     sla_timer = serializers.SerializerMethodField()
     is_terminal = serializers.BooleanField(read_only=True)
     campaign_status_display = serializers.CharField(source='get_campaign_status_display', read_only=True)
@@ -66,7 +65,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
         model = Lead
         fields = [
             'id', 'name', 'phone', 'email', 'intent', 'status',
-            'sub_source', 'converted_client_id', 'sla_timer', 'is_terminal',
+            'source', 'converted_client_id', 'sla_timer', 'is_terminal',
             # Campaign tracking fields
             'ycloud_contact_id', 'campaign_status', 'campaign_status_display',
             'current_tags', 'response_count', 'first_response_at', 'last_response_at',
@@ -83,39 +82,39 @@ class LeadCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating leads.
 
-    Accepts: name, phone, email, sub_source_id, intent
-    Validates that sub_source belongs to an untrusted channel.
+    Accepts: name, phone, email, source_id, intent
+    Validates that source belongs to an untrusted channel.
     """
-    sub_source_id = serializers.UUIDField(write_only=True)
+    source_id = serializers.UUIDField(write_only=True)
 
     class Meta:
         model = Lead
-        fields = ['name', 'phone', 'email', 'sub_source_id', 'intent']
+        fields = ['name', 'phone', 'email', 'source_id', 'intent']
 
-    def validate_sub_source_id(self, value):
-        """Validate sub_source exists and belongs to untrusted channel."""
+    def validate_source_id(self, value):
+        """Validate source exists and belongs to untrusted channel."""
         try:
-            sub_source = SubSource.objects.select_related(
-                'source__channel'
+            source = Source.objects.select_related(
+                'channel'
             ).get(id=value)
-        except SubSource.DoesNotExist:
-            raise serializers.ValidationError('Sub-source does not exist.')
+        except Source.DoesNotExist:
+            raise serializers.ValidationError('Source does not exist.')
 
-        if sub_source.source.channel.is_trusted:
+        if source.channel.is_trusted:
             raise serializers.ValidationError(
                 f'Leads can only be created from untrusted channels. '
-                f'Channel "{sub_source.source.channel.name}" is trusted.'
+                f'Channel "{source.channel.name}" is trusted.'
             )
 
         return value
 
     def create(self, validated_data):
-        """Create lead with sub_source_id."""
-        sub_source_id = validated_data.pop('sub_source_id')
-        sub_source = SubSource.objects.get(id=sub_source_id)
+        """Create lead with source_id."""
+        source_id = validated_data.pop('source_id')
+        source = Source.objects.get(id=source_id)
 
         lead = Lead(
-            sub_source=sub_source,
+            source=source,
             status=LeadStatus.ACTIVE,
             **validated_data
         )

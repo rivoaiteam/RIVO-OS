@@ -20,16 +20,18 @@ const STATUS_TABS: { value: 'all' | 'active' | 'inactive'; label: string }[] = [
 
 const roleColors: Record<string, string> = {
   admin: 'bg-[#e8f0f5] text-[#1e3a5f]',
-  manager: 'bg-[#e8f0f5] text-[#1e3a5f]',
+  channel_owner: 'bg-[#e8f0f5] text-[#1e3a5f]',
+  team_leader: 'bg-[#e8eef5] text-[#2a4a6b]',
   mortgage_specialist: 'bg-[#e8f5f0] text-[#2d6a4f]',
-  process_executive: 'bg-[#f0e8f5] text-[#6b4c8a]',
+  process_officer: 'bg-[#f0e8f5] text-[#6b4c8a]',
 }
 
 const roleLabels: Record<string, string> = {
   admin: 'Admin',
-  manager: 'Manager',
+  channel_owner: 'Channel Owner',
+  team_leader: 'Team Leader',
   mortgage_specialist: 'Mortgage Specialist',
-  process_executive: 'Process Executive',
+  process_officer: 'Process Executive',
 }
 
 const avatarColors = [
@@ -160,9 +162,10 @@ export function UsersPage() {
           >
             <option value="all">All Roles</option>
             <option value="admin">Admin</option>
-            <option value="manager">Manager</option>
+            <option value="channel_owner">Channel Owner</option>
+            <option value="team_leader">Team Leader</option>
             <option value="mortgage_specialist">Mortgage Specialist</option>
-            <option value="process_executive">Process Executive</option>
+            <option value="process_officer">Process Executive</option>
           </select>
         </div>
       </div>
@@ -178,9 +181,9 @@ export function UsersPage() {
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="w-1/3 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
-                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Username</th>
-                <th className="w-1/4 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Role</th>
-                <th className="w-16 text-right pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                <th className="w-1/3 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Username</th>
+                <th className="w-1/3 text-left pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Role</th>
+                <th className="w-12 text-right pb-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>

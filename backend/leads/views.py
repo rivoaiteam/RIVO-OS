@@ -71,7 +71,7 @@ class LeadViewSet(viewsets.ModelViewSet):
     """
 
     queryset = Lead.objects.select_related(
-        'sub_source__source__channel'
+        'source__channel'
     ).filter(converted_client_id__isnull=True).order_by('-created_at')
     permission_classes = [IsAuthenticated, CanAccessLeads]
     pagination_class = LeadPagination
@@ -105,15 +105,15 @@ class LeadViewSet(viewsets.ModelViewSet):
         if status_filter and status_filter in LeadStatus.values:
             queryset = queryset.filter(status=status_filter)
 
-        # Sub-source filter
-        sub_source_id = self.request.query_params.get('sub_source_id', '').strip()
-        if sub_source_id:
-            queryset = queryset.filter(sub_source_id=sub_source_id)
+        # Source filter
+        source_id = self.request.query_params.get('source_id', '').strip()
+        if source_id:
+            queryset = queryset.filter(source_id=source_id)
 
         # Channel filter (filter by channel id)
         channel_id = self.request.query_params.get('channel_id', '').strip()
         if channel_id:
-            queryset = queryset.filter(sub_source__source__channel_id=channel_id)
+            queryset = queryset.filter(source__channel_id=channel_id)
 
         # Campaign status filter
         campaign_status_filter = self.request.query_params.get('campaign_status', '').strip()
@@ -144,9 +144,9 @@ class LeadViewSet(viewsets.ModelViewSet):
         Create a new lead.
 
         POST /leads
-        Body: { name, phone, email?, sub_source_id, intent? }
+        Body: { name, phone, email?, source_id, intent? }
 
-        Validates that sub_source belongs to an untrusted channel.
+        Validates that source belongs to an untrusted channel.
         Sets status to 'active' by default.
         """
         serializer = self.get_serializer(data=request.data)
@@ -272,7 +272,7 @@ class LeadViewSet(viewsets.ModelViewSet):
                 name=lead.name,
                 phone=lead.phone,
                 email=lead.email,
-                sub_source=lead.sub_source,
+                source=lead.source,
                 converted_from_lead=lead,
                 notes=lead.intent,
                 status=ClientStatus.ACTIVE,
@@ -481,9 +481,10 @@ class LeadViewSet(viewsets.ModelViewSet):
         """
         lead = self.get_object()
 
-        messages = LeadMessage.objects.filter(lead=lead).order_by('created_at')
+        messages = list(LeadMessage.objects.filter(lead=lead).order_by('created_at'))
 
         # Sync status from YCloud for outbound messages that aren't read/failed yet
+        updated_msgs = []
         for msg in messages:
             if (msg.direction == MessageDirection.OUTBOUND and
                 msg.ycloud_message_id and
@@ -506,14 +507,16 @@ class LeadViewSet(viewsets.ModelViewSet):
                             if ycloud_data.get('deliverTime'):
                                 from django.utils.dateparse import parse_datetime
                                 msg.delivered_at = parse_datetime(ycloud_data['deliverTime'])
-                            msg.save()
+                            updated_msgs.append(msg)
                             logger.info(f'Updated lead message {msg.id} status to {new_status}')
 
                 except YCloudError as e:
                     logger.warning(f'Failed to sync status for lead message {msg.id}: {e.message}')
 
-        # Refresh queryset after updates
-        messages = LeadMessage.objects.filter(lead=lead).order_by('created_at')
+        # Bulk update all changed messages in one query
+        if updated_msgs:
+            LeadMessage.objects.bulk_update(updated_msgs, ['status', 'delivered_at'])
+
         serializer = LeadMessageSerializer(messages, many=True)
 
         return Response({
@@ -521,7 +524,7 @@ class LeadViewSet(viewsets.ModelViewSet):
             'lead_name': lead.name,
             'lead_phone': lead.phone,
             'messages': serializer.data,
-            'count': messages.count()
+            'count': len(messages)
         })
 
     @action(detail=True, methods=['post'], url_path='messages/send')

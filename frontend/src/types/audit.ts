@@ -11,8 +11,6 @@ export type ReminderStatus = 'pending' | 'completed' | 'dismissed'
 
 export type NotableType = 'client' | 'case' | 'lead'
 
-export type ActionType = 'note' | 'document' | 'record' | 'reminder' | 'system'
-
 // User Summary
 
 export interface UserSummary {
@@ -79,7 +77,7 @@ export interface ActivityTimelineEntry {
   time_display: string
   user_name: string
   action_summary: string
-  action_type: ActionType
+  action_type: string
   entry_type: AuditAction
   record_type: string | null
   record_id: string | null
@@ -125,6 +123,8 @@ export interface DashboardReminder {
   notable_type: NotableType
   notable_id: string
   notable_name: string
+  client_name: string | null
+  case_bank: string | null
   reminder_date: string
   reminder_time: string | null
   status: ReminderStatus
@@ -179,10 +179,7 @@ export const TABLE_NAME_LABELS: Record<string, string> = {
   reminders: 'Reminders',
   client_documents: 'Client Documents',
   case_documents: 'Case Documents',
-  audit_logs: 'Audit Logs',
   channels: 'Channels',
   sources: 'Sources',
-  sub_sources: 'Sub-Sources',
   users: 'Users',
-  document_types: 'Document Types',
 }

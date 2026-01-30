@@ -160,7 +160,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
   const [nationality, setNationality] = useState('')
   const [residency, setResidency] = useState<ResidencyType>('uae_resident')
   const [employmentType, setEmploymentType] = useState<EmploymentType>('salaried')
-  const [subSourceId, setSubSourceId] = useState('')
+  const [sourceId, setSourceId] = useState('')
   const [applicationType, setApplicationType] = useState<'single' | 'joint'>('single')
   const [monthlySalary, setMonthlySalary] = useState('')
   const [totalAddbacks, setTotalAddbacks] = useState('')
@@ -226,7 +226,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       setApplicationType(client.application_type || 'single')
       setMonthlySalary(client.monthly_salary || '')
       setTotalAddbacks(client.total_addbacks || '')
-      setSubSourceId(client.sub_source?.id || '')
+      setSourceId(client.source?.id || '')
 
       // Build liabilities from client data
       const clientLiabilities: { type: string; amount: string; bankName?: string }[] = []
@@ -371,7 +371,7 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
     if (!nationality) errors.push('Nationality is required')
     if (!residency) errors.push('Residency is required')
     if (!employmentType) errors.push('Employment is required')
-    if (!subSourceId && isCreateMode) errors.push('Source is required')
+    if (!sourceId && isCreateMode) errors.push('Source is required')
 
     // Income
     if (!monthlySalary) errors.push('Monthly Salary is required')
@@ -435,9 +435,9 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
       tenure_months: parseInt(tenureMonths) || 0,
     }
 
-    // Only include sub_source_id for create mode (not for updates, especially converted clients)
+    // Only include source_id for create mode (not for updates, especially converted clients)
     if (isCreateMode) {
-      data.sub_source_id = subSourceId || undefined
+      data.source_id = sourceId || undefined
     }
 
     try {
@@ -747,9 +747,9 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
                 </FormField>
                 <FormField label="Source *" className="col-span-2">
                   <TrustedSourceSelector
-                    value={subSourceId}
-                    onChange={setSubSourceId}
-                    currentSource={client?.sub_source}
+                    value={sourceId}
+                    onChange={setSourceId}
+                    currentSource={client?.source}
                   />
                 </FormField>
               </div>
@@ -1095,7 +1095,7 @@ interface TrustedSourceSelectorProps {
   currentSource?: {
     id: string
     name: string
-    source_name: string
+    channel_name: string
   } | null
 }
 
@@ -1105,7 +1105,7 @@ function TrustedSourceSelector({ value, onChange, currentSource }: TrustedSource
   if (isLoading && currentSource) {
     return (
       <select className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg bg-white" disabled>
-        <option>{currentSource.name} ({currentSource.source_name})</option>
+        <option>{currentSource.name} ({currentSource.channel_name})</option>
       </select>
     )
   }
@@ -1126,11 +1126,11 @@ function TrustedSourceSelector({ value, onChange, currentSource }: TrustedSource
       <option value="">Select source...</option>
       {currentSource && !hasCurrentSource && (
         <option key={currentSource.id} value={currentSource.id}>
-          {currentSource.name} ({currentSource.source_name})
+          {currentSource.name} ({currentSource.channel_name})
         </option>
       )}
       {sources?.map(opt => (
-        <option key={opt.id} value={opt.id}>{opt.name} ({opt.sourceName})</option>
+        <option key={opt.id} value={opt.id}>{opt.name} ({opt.channelName})</option>
       ))}
     </select>
   )

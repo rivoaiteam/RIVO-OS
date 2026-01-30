@@ -6,7 +6,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from users.permissions import IsAuthenticated, IsAdminRole
+from users.permissions import IsAuthenticated, CanAccessTemplates
 from users.iam import can, Action, Resource
 from .models import MessageTemplate, TemplateCategory
 from .serializers import (
@@ -21,20 +21,13 @@ class MessageTemplateViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing message templates.
 
-    List/Retrieve: All authenticated users
-    Create/Update/Delete: Admin only
+    Access controlled by IAM matrix (Resource.TEMPLATES).
+    Admin, MS, and PO have full CRUD. Others per IAM config.
     """
     queryset = MessageTemplate.objects.all()
     serializer_class = MessageTemplateSerializer
 
-    def get_permissions(self):
-        """
-        Admin required for create, update, delete.
-        Any authenticated user can list and retrieve.
-        """
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAdminRole()]
-        return [IsAuthenticated()]
+    permission_classes = [IsAuthenticated, CanAccessTemplates]
 
     def get_serializer_class(self):
         """Use different serializer for create/update."""

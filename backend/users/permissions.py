@@ -35,26 +35,26 @@ class IsAdmin(permissions.BasePermission):
 IsAdminRole = IsAdmin
 
 
-class IsManagerOrAdmin(permissions.BasePermission):
-    """Permission class that allows Manager or Admin roles."""
+class IsChannelOwnerOrAdmin(permissions.BasePermission):
+    """Permission class that allows Channel Owner or Admin roles."""
 
-    message = 'Access denied. Manager or Admin role required.'
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        if not request.user or not hasattr(request.user, 'role'):
-            return False
-        return request.user.role in [UserRole.ADMIN, UserRole.MANAGER]
-
-
-class IsManager(permissions.BasePermission):
-    """Permission class for Manager role."""
-
-    message = 'Access denied. Manager role required.'
+    message = 'Access denied. Channel Owner or Admin role required.'
 
     def has_permission(self, request: Request, view: APIView) -> bool:
         if not request.user or not hasattr(request.user, 'role'):
             return False
-        return request.user.role == UserRole.MANAGER
+        return request.user.role in [UserRole.ADMIN, UserRole.CHANNEL_OWNER]
+
+
+class IsChannelOwner(permissions.BasePermission):
+    """Permission class for Channel Owner role."""
+
+    message = 'Access denied. Channel Owner role required.'
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        if not request.user or not hasattr(request.user, 'role'):
+            return False
+        return request.user.role == UserRole.CHANNEL_OWNER
 
 
 class HasResourcePermission(permissions.BasePermission):
@@ -134,3 +134,12 @@ class CanAccessCases(permissions.BasePermission):
     def has_permission(self, request: Request, view: APIView) -> bool:
         action = HasResourcePermission.METHOD_ACTION_MAP.get(request.method, Action.VIEW)
         return can(request.user, action, Resource.CASES)
+
+
+class CanAccessTemplates(permissions.BasePermission):
+    """Permission for templates access based on IAM."""
+    message = 'Access denied. No permission for templates.'
+
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        action = HasResourcePermission.METHOD_ACTION_MAP.get(request.method, Action.VIEW)
+        return can(request.user, action, Resource.TEMPLATES)
