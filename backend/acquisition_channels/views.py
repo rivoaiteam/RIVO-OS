@@ -8,7 +8,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from acquisition_channels.models import Channel, Source, Team
+from acquisition_channels.models import Channel, Source
 from acquisition_channels.serializers import (
     ChannelSerializer,
     ChannelListSerializer,
@@ -17,8 +17,6 @@ from acquisition_channels.serializers import (
     SourceSerializer,
     SourceCreateSerializer,
     MSUserSerializer,
-    TeamSerializer,
-    TeamCreateUpdateSerializer,
 )
 from users.models import User, UserRole
 from users.permissions import IsAdminRole, IsAuthenticated, IsChannelOwnerOrAdmin
@@ -167,97 +165,3 @@ class SourceViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class TeamViewSet(viewsets.ModelViewSet):
-    """ViewSet for team management."""
-    queryset = Team.objects.all().select_related(
-        'channel', 'team_leader', 'mortgage_specialist', 'process_officer'
-    ).order_by('name')
-    permission_classes = [IsAuthenticated]
-
-    def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return TeamCreateUpdateSerializer
-        return TeamSerializer
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        user = self.request.user
-        # Admin sees all teams
-        if user.role == UserRole.ADMIN:
-            return queryset
-        # Channel Owner sees only their channels' teams
-        if user.role == UserRole.CHANNEL_OWNER:
-            return queryset.filter(channel__owner=user)
-        # TL/MS/PO see their own team only
-        from django.db.models import Q
-        return queryset.filter(
-            Q(team_leader=user) | Q(mortgage_specialist=user) | Q(process_officer=user)
-        )
-
-    def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'org_chart']:
-            return [IsAuthenticated()]
-        return [IsChannelOwnerOrAdmin()]
-
-    @action(detail=False, methods=['get'])
-    def org_chart(self, request):
-        """Return org chart tree: owner -> channels -> teams -> members."""
-        from django.db.models import Q, Prefetch
-
-        user = request.user
-        teams_prefetch = Prefetch(
-            'teams',
-            queryset=Team.objects.select_related(
-                'team_leader', 'mortgage_specialist', 'process_officer'
-            )
-        )
-
-        if user.role == UserRole.ADMIN:
-            channels = Channel.objects.all().select_related('owner').prefetch_related(teams_prefetch)
-        elif user.role == UserRole.CHANNEL_OWNER:
-            channels = Channel.objects.filter(owner=user).select_related('owner').prefetch_related(teams_prefetch)
-        else:
-            team_qs = Team.objects.filter(
-                Q(team_leader=user) | Q(mortgage_specialist=user) | Q(process_officer=user)
-            ).select_related('channel')
-            channel_ids = team_qs.values_list('channel_id', flat=True).distinct()
-            channels = Channel.objects.filter(id__in=channel_ids).select_related('owner').prefetch_related(teams_prefetch)
-
-        # Group channels by owner
-        owners_map = {}
-        unowned = []
-        for channel in channels:
-            channel_data = {
-                'id': str(channel.id),
-                'name': channel.name,
-                'teams': [],
-            }
-            for team in channel.teams.filter(is_active=True):
-                channel_data['teams'].append({
-                    'id': str(team.id),
-                    'name': team.name,
-                    'team_leader': {'id': str(team.team_leader.id), 'name': team.team_leader.name} if team.team_leader else None,
-                    'mortgage_specialist': {'id': str(team.mortgage_specialist.id), 'name': team.mortgage_specialist.name} if team.mortgage_specialist else None,
-                    'process_officer': {'id': str(team.process_officer.id), 'name': team.process_officer.name} if team.process_officer else None,
-                })
-            if channel.owner:
-                owner_id = str(channel.owner.id)
-                if owner_id not in owners_map:
-                    owners_map[owner_id] = {
-                        'id': owner_id,
-                        'name': channel.owner.name,
-                        'channels': [],
-                    }
-                owners_map[owner_id]['channels'].append(channel_data)
-            else:
-                unowned.append(channel_data)
-
-        result = list(owners_map.values())
-        if unowned:
-            result.append({
-                'id': None,
-                'name': 'Unassigned',
-                'channels': unowned,
-            })
-
-        return Response(result)

@@ -32,11 +32,6 @@ export function DocumentChecklist({
   const [newDocName, setNewDocName] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const totalRequired = items.filter((item) => item.document_type.required).length
-  const uploadedRequired = items.filter(
-    (item) => item.document_type.required && item.is_uploaded
-  ).length
-
   const handleAddClick = () => {
     setIsAdding(true)
     setNewDocName('')
@@ -76,12 +71,7 @@ export function DocumentChecklist({
 
       {/* Header */}
       {title && (
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{title}</h4>
-          <span className="text-xs text-gray-400">
-            {uploadedRequired}/{totalRequired}
-          </span>
-        </div>
+        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{title}</h4>
       )}
 
       {/* Document List */}
@@ -90,7 +80,8 @@ export function DocumentChecklist({
           <DocumentChecklistItem
             key={item.document_type.id}
             documentType={item.document_type}
-            document={item.document}
+            documents={item.documents}
+            uploadedCount={item.uploaded_count}
             onUpload={onUpload}
             onView={onView}
             onDelete={readOnly ? undefined : onDelete}

@@ -212,6 +212,9 @@ class ClientDetailSerializer(serializers.ModelSerializer):
     client_to_case_sla_status = serializers.SerializerMethodField()
     assigned_to = serializers.SerializerMethodField()
 
+    # Phone lock status
+    phone_locked = serializers.SerializerMethodField()
+
     # Cases linked to this client
     cases = serializers.SerializerMethodField()
 
@@ -248,6 +251,8 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             # SLA Status
             'first_contact_sla_status', 'client_to_case_sla_status',
             'first_contact_completed_at', 'assigned_to',
+            # Phone lock
+            'phone_locked',
             # Cases
             'cases',
             # Timestamps
@@ -301,6 +306,11 @@ class ClientDetailSerializer(serializers.ModelSerializer):
             return ClientExtraDetailsSerializer(extra).data
         except ClientExtraDetails.DoesNotExist:
             return None
+
+    def get_phone_locked(self, obj) -> bool:
+        """Phone is locked once WhatsApp messaging has started."""
+        from whatsapp.models import WhatsAppMessage
+        return WhatsAppMessage.objects.filter(client=obj).exists()
 
     def get_cases(self, obj: Client) -> list[dict] | None:
         """Get list of cases linked to this client (uses prefetched data)."""
@@ -418,6 +428,7 @@ class ClientUpdateSerializer(serializers.ModelSerializer):
     Serializer for updating clients.
 
     Allows partial updates to any writable field.
+    Phone number is locked once a WhatsApp message has been sent.
     """
 
     class Meta:
@@ -442,6 +453,17 @@ class ClientUpdateSerializer(serializers.ModelSerializer):
             # Intent
             'notes', 'timeline',
         ]
+
+    def validate_phone(self, value):
+        """Prevent phone changes once WhatsApp messaging has started."""
+        client = self.instance
+        if client and value and value != client.phone:
+            from whatsapp.models import WhatsAppMessage
+            if WhatsAppMessage.objects.filter(client=client).exists():
+                raise serializers.ValidationError(
+                    'Phone number cannot be changed after WhatsApp messaging has started.'
+                )
+        return value
 
 
 class ClientChangeStatusSerializer(serializers.Serializer):

@@ -88,7 +88,7 @@ export function CaseDocumentTab({ caseId }: CaseDocumentTabProps) {
 
     try {
       const allItems = [...(checklist?.primary || []), ...(checklist?.co_applicant || [])]
-      const item = allItems.find(i => i.document?.id === documentId)
+      const item = allItems.find(i => i.documents.some(d => d.id === documentId))
       const documentTypeId = item?.document_type.id
       const isCustomType = item?.document_type && !item.document_type.is_system
 

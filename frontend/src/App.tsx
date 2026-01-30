@@ -10,9 +10,7 @@ import { LeadsPage } from '@/pages/LeadsPage'
 import { ClientsPage } from '@/pages/ClientsPage'
 import { CasesPage } from '@/pages/CasesPage'
 import { TemplatesSettingsPage } from '@/pages/SettingsPage'
-import TeamsPage from '@/pages/TeamsPage'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { SLABreachesPage } from '@/pages/SLABreachesPage'
 import { AuditLogPage } from '@/pages/AuditLogPage'
 import './index.css'
 
@@ -84,10 +82,8 @@ function AppRoutes() {
                   <Route path="/cases" element={<CasesPage />} />
 
                   {/* Admin workspace routes */}
-                  <Route path="/teams" element={<TeamsPage />} />
                   <Route path="/channels" element={<ChannelsPage />} />
                   <Route path="/users" element={<UsersPage />} />
-                  <Route path="/sla-breaches" element={<SLABreachesPage />} />
                   <Route path="/audit-log" element={<AuditLogPage />} />
 
                   {/* Toolbox */}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Loader2, Building2 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useDashboardReminders, useCompleteReminder } from '@/hooks/useAudit'
 import { ClientSidePanel } from '@/components/ClientSidePanel'
 import { CaseSidePanel } from '@/components/CaseSidePanel'
@@ -15,11 +16,14 @@ import { cn } from '@/lib/utils'
 import type { NotableType } from '@/types/audit'
 
 export function DashboardPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+
   const [selectedClient, setSelectedClient] = useState<string | null>(null)
   const [selectedCase, setSelectedCase] = useState<string | null>(null)
   const [selectedLead, setSelectedLead] = useState<string | null>(null)
 
-  const { data: reminders, isLoading } = useDashboardReminders()
+  const { data: reminders, isLoading } = useDashboardReminders(!isAdmin)
   const completeMutation = useCompleteReminder()
 
   const handleNavigate = (type: NotableType, id: string) => {
@@ -55,8 +59,22 @@ export function DashboardPage() {
     return ` at ${hour12}:${minutes} ${ampm}`
   }
 
-  if (isLoading) {
+  if (!isAdmin && isLoading) {
     return <PageLoading />
+  }
+
+  if (isAdmin) {
+    return (
+      <TablePageLayout>
+        <div className="px-6 py-4">
+          <PageHeader
+            title="Dashboard"
+            subtitle={`Welcome back, ${user?.name?.split(' ')[0] ?? 'Admin'}`}
+            hideAction
+          />
+        </div>
+      </TablePageLayout>
+    )
   }
 
   return (

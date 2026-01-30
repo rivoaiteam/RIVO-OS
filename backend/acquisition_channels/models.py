@@ -141,23 +141,3 @@ class Source(models.Model):
         if self.sla_minutes is not None:
             return self.sla_minutes
         return self.channel.default_sla_minutes
-
-
-class Team(models.Model):
-    """Team within a channel. Each team has a team leader, one MS and one PO."""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=100)
-    channel = models.ForeignKey('Channel', on_delete=models.CASCADE, related_name='teams')
-    team_leader = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='led_teams')
-    mortgage_specialist = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='ms_teams')
-    process_officer = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='po_teams')
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = 'teams'
-        ordering = ['name']
-
-    def __str__(self):
-        return f'{self.name} ({self.channel.name})'

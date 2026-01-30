@@ -46,6 +46,19 @@ export function LeadSidePanel({ leadId, onClose }: LeadSidePanelProps) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [whatsAppError, setWhatsAppError] = useState<string | null>(null)
 
+  // Auto-dismiss errors after 3 seconds
+  useEffect(() => {
+    if (!saveError) return
+    const t = setTimeout(() => setSaveError(null), 3000)
+    return () => clearTimeout(t)
+  }, [saveError])
+
+  useEffect(() => {
+    if (!whatsAppError) return
+    const t = setTimeout(() => setWhatsAppError(null), 3000)
+    return () => clearTimeout(t)
+  }, [whatsAppError])
+
   // Sync form state when lead data changes
   useEffect(() => {
     if (lead) {

@@ -75,15 +75,22 @@ class LeadTrackingService:
     @staticmethod
     def get_default_campaign_source() -> Source:
         """
-        Get or create a default Source for campaign leads.
+        Get the source for campaign leads.
+
+        Priority:
+        1. Source from an active campaign (configured in Campaign model)
+        2. Any source from an untrusted channel
         """
-        source = Source.objects.filter(
-            name__icontains='whatsapp campaign'
-        ).first()
+        from campaigns.models import Campaign
 
-        if source:
-            return source
+        # Use the source configured on an active campaign
+        active_campaign = Campaign.objects.filter(
+            is_active=True, source__isnull=False
+        ).select_related('source').first()
+        if active_campaign and active_campaign.source:
+            return active_campaign.source
 
+        # Fallback: any untrusted channel source
         source = Source.objects.filter(
             channel__is_trusted=False
         ).first()
@@ -92,8 +99,8 @@ class LeadTrackingService:
             return source
 
         raise ValueError(
-            'No default campaign Source configured. '
-            'Please create a Source for WhatsApp campaigns from an untrusted channel.'
+            'No campaign source configured. '
+            'Set a source on an active Campaign, or create a source under an untrusted channel.'
         )
 
     @staticmethod
@@ -178,6 +185,7 @@ class LeadTrackingService:
         button_payload: str = '',
         template_name: str = '',
         ycloud_contact_id: str = '',
+        campaign_source_id: str = None,
         metadata: dict = None
     ) -> Lead:
         """
@@ -194,7 +202,8 @@ class LeadTrackingService:
             lead, created = LeadTrackingService.find_or_create_lead(
                 phone=phone,
                 name=name,
-                ycloud_contact_id=ycloud_contact_id
+                ycloud_contact_id=ycloud_contact_id,
+                campaign_source_id=campaign_source_id
             )
 
             # Determine message type enum

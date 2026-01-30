@@ -281,13 +281,16 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
 
         # Get uploaded documents for this client
         # Build lookups by both ID and NAME for cross-category matching
+        # Each key maps to a list of documents (multi-file support)
         uploaded_docs_by_id = {}
         uploaded_docs_by_name = {}
         for doc in self.get_queryset():
-            uploaded_docs_by_id[(doc.document_type_id, doc.applicant_role)] = doc
+            key_id = (doc.document_type_id, doc.applicant_role)
+            uploaded_docs_by_id.setdefault(key_id, []).append(doc)
             # Use document type name for cross-category matching
             doc_name = doc.document_type.name
-            uploaded_docs_by_name[(doc_name, doc.applicant_role)] = doc
+            key_name = (doc_name, doc.applicant_role)
+            uploaded_docs_by_name.setdefault(key_name, []).append(doc)
 
         # Build checklist for primary applicant
         primary_checklist = []
@@ -295,41 +298,41 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
         for doc_type in document_types:
             if doc_type.applicant_type in ['primary', 'both']:
                 # Try exact ID match first, then name match (for cross-category)
-                doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY))
-                if not doc:
-                    doc = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.PRIMARY))
-                if doc:
-                    matched_doc_names.add((doc.document_type.name, ApplicantRole.PRIMARY))
+                docs = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY), [])
+                if not docs:
+                    docs = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.PRIMARY), [])
+                if docs:
+                    matched_doc_names.add((docs[0].document_type.name, ApplicantRole.PRIMARY))
                 primary_checklist.append({
                     'document_type': DocumentTypeSerializer(doc_type).data,
-                    'document': ClientDocumentSerializer(doc).data if doc else None,
-                    'is_uploaded': doc is not None,
+                    'documents': ClientDocumentSerializer(docs, many=True).data,
+                    'uploaded_count': len(docs),
                 })
 
         # Build conditional checklist
         conditional_checklist = []
         for doc_type in conditional_types:
-            doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY))
-            if not doc:
-                doc = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.PRIMARY))
-            if doc:
-                matched_doc_names.add((doc.document_type.name, ApplicantRole.PRIMARY))
+            docs = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY), [])
+            if not docs:
+                docs = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.PRIMARY), [])
+            if docs:
+                matched_doc_names.add((docs[0].document_type.name, ApplicantRole.PRIMARY))
             conditional_checklist.append({
                 'document_type': DocumentTypeSerializer(doc_type).data,
-                'document': ClientDocumentSerializer(doc).data if doc else None,
-                'is_uploaded': doc is not None,
+                'documents': ClientDocumentSerializer(docs, many=True).data,
+                'uploaded_count': len(docs),
             })
 
         # Build custom checklist for client-specific custom document types
         custom_checklist = []
         for doc_type in custom_types:
-            doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY))
-            if doc:
-                matched_doc_names.add((doc.document_type.name, ApplicantRole.PRIMARY))
+            docs = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.PRIMARY), [])
+            if docs:
+                matched_doc_names.add((docs[0].document_type.name, ApplicantRole.PRIMARY))
             custom_checklist.append({
                 'document_type': DocumentTypeSerializer(doc_type).data,
-                'document': ClientDocumentSerializer(doc).data if doc else None,
-                'is_uploaded': doc is not None,
+                'documents': ClientDocumentSerializer(docs, many=True).data,
+                'uploaded_count': len(docs),
             })
 
         # Build checklist for co-applicant (if joint application)
@@ -340,27 +343,27 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
             co_applicant_checklist = []
             for doc_type in document_types:
                 if doc_type.applicant_type in ['co_applicant', 'both']:
-                    doc = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.CO_APPLICANT))
-                    if not doc:
-                        doc = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.CO_APPLICANT))
-                    if doc:
-                        matched_doc_names.add((doc.document_type.name, ApplicantRole.CO_APPLICANT))
+                    docs = uploaded_docs_by_id.get((doc_type.id, ApplicantRole.CO_APPLICANT), [])
+                    if not docs:
+                        docs = uploaded_docs_by_name.get((doc_type.name, ApplicantRole.CO_APPLICANT), [])
+                    if docs:
+                        matched_doc_names.add((docs[0].document_type.name, ApplicantRole.CO_APPLICANT))
                     co_applicant_checklist.append({
                         'document_type': DocumentTypeSerializer(doc_type).data,
-                        'document': ClientDocumentSerializer(doc).data if doc else None,
-                        'is_uploaded': doc is not None,
+                        'documents': ClientDocumentSerializer(docs, many=True).data,
+                        'uploaded_count': len(docs),
                     })
 
         # Find uploaded documents that don't match any current requirement
         # (e.g., category-specific docs from before a profile change)
         other_documents = []
-        for (doc_type_id, role), doc in uploaded_docs_by_id.items():
-            doc_name = doc.document_type.name
+        for (doc_type_id, role), docs in uploaded_docs_by_id.items():
+            doc_name = docs[0].document_type.name
             if (doc_name, role) not in matched_doc_names:
                 other_documents.append({
-                    'document_type': DocumentTypeSerializer(doc.document_type).data,
-                    'document': ClientDocumentSerializer(doc).data,
-                    'is_uploaded': True,
+                    'document_type': DocumentTypeSerializer(docs[0].document_type).data,
+                    'documents': ClientDocumentSerializer(docs, many=True).data,
+                    'uploaded_count': len(docs),
                 })
 
         return Response({
@@ -397,6 +400,29 @@ class ClientDocumentViewSet(viewsets.ModelViewSet):
             context={'client': client}
         )
         serializer.is_valid(raise_exception=True)
+
+        # Validate max_files limit
+        document_type_id = serializer.validated_data['document_type_id']
+        applicant_role = serializer.validated_data.get('applicant_role', ApplicantRole.PRIMARY)
+        try:
+            doc_type = DocumentType.objects.get(pk=document_type_id)
+        except DocumentType.DoesNotExist:
+            return Response(
+                {'error': 'Invalid document type.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        uploaded_count = ClientDocument.objects.filter(
+            client=client,
+            document_type_id=document_type_id,
+            applicant_role=applicant_role,
+        ).count()
+
+        if uploaded_count >= doc_type.max_files:
+            return Response(
+                {'error': f'Maximum number of files ({doc_type.max_files}) already uploaded for this document type.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             document = serializer.save()
@@ -494,20 +520,20 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
             Q(category__isnull=True) | Q(category='')
         ).order_by('display_order', 'name')
 
-        # Get uploaded documents for this case
-        uploaded_docs = {
-            (doc.document_type_id, doc.applicant_role): doc
-            for doc in self.get_queryset()
-        }
+        # Get uploaded documents for this case grouped by (type, role)
+        uploaded_docs = {}
+        for doc in self.get_queryset():
+            key = (doc.document_type_id, doc.applicant_role)
+            uploaded_docs.setdefault(key, []).append(doc)
 
         # Build checklist for primary applicant
         primary_checklist = []
         for doc_type in document_types:
-            doc = uploaded_docs.get((doc_type.id, ApplicantRole.PRIMARY))
+            docs = uploaded_docs.get((doc_type.id, ApplicantRole.PRIMARY), [])
             primary_checklist.append({
                 'document_type': DocumentTypeSerializer(doc_type).data,
-                'document': CaseDocumentSerializer(doc).data if doc else None,
-                'is_uploaded': doc is not None,
+                'documents': CaseDocumentSerializer(docs, many=True).data,
+                'uploaded_count': len(docs),
             })
 
         # Build checklist for co-applicant (if joint application)
@@ -518,11 +544,11 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
             co_applicant_checklist = []
             for doc_type in document_types:
                 if doc_type.applicant_type in ['co_applicant', 'both']:
-                    doc = uploaded_docs.get((doc_type.id, ApplicantRole.CO_APPLICANT))
+                    docs = uploaded_docs.get((doc_type.id, ApplicantRole.CO_APPLICANT), [])
                     co_applicant_checklist.append({
                         'document_type': DocumentTypeSerializer(doc_type).data,
-                        'document': CaseDocumentSerializer(doc).data if doc else None,
-                        'is_uploaded': doc is not None,
+                        'documents': CaseDocumentSerializer(docs, many=True).data,
+                        'uploaded_count': len(docs),
                     })
 
         return Response({
@@ -555,6 +581,29 @@ class CaseDocumentViewSet(viewsets.ModelViewSet):
             context={'case': case}
         )
         serializer.is_valid(raise_exception=True)
+
+        # Validate max_files limit
+        document_type_id = serializer.validated_data['document_type_id']
+        applicant_role = serializer.validated_data.get('applicant_role', ApplicantRole.PRIMARY)
+        try:
+            doc_type = DocumentType.objects.get(pk=document_type_id)
+        except DocumentType.DoesNotExist:
+            return Response(
+                {'error': 'Invalid document type.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        uploaded_count = CaseDocument.objects.filter(
+            case=case,
+            document_type_id=document_type_id,
+            applicant_role=applicant_role,
+        ).count()
+
+        if uploaded_count >= doc_type.max_files:
+            return Response(
+                {'error': f'Maximum number of files ({doc_type.max_files}) already uploaded for this document type.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             document = serializer.save()

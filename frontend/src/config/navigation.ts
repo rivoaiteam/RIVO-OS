@@ -9,8 +9,6 @@ import {
   Radio,
   FileText,
   UserCheck,
-  UsersRound,
-  Clock,
   ScrollText,
   type LucideIcon,
 } from 'lucide-react'
@@ -23,8 +21,6 @@ export interface NavItem {
   roles: UserRole[]
   section?: string
   children?: NavItem[]
-  /** Optional: show a badge with dynamic count (used for SLA Breaches) */
-  showBadge?: boolean
 }
 
 export interface NavSection {
@@ -38,8 +34,6 @@ const adminWorkspace: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin'], section: 'workspace' },
   { id: 'users-roles', label: 'Users', href: '/users', icon: UserCog, roles: ['admin'], section: 'workspace' },
   { id: 'channels', label: 'Channels', href: '/channels', icon: Radio, roles: ['admin'], section: 'workspace' },
-  { id: 'teams', label: 'Teams', href: '/teams', icon: UsersRound, roles: ['admin'], section: 'workspace' },
-  { id: 'sla-breaches', label: 'SLA Breaches', href: '/sla-breaches', icon: Clock, roles: ['admin'], section: 'workspace' },
   { id: 'audit-log', label: 'Audit Log', href: '/audit-log', icon: ScrollText, roles: ['admin'], section: 'workspace' },
 ]
 
@@ -48,8 +42,6 @@ const channelOwnerWorkspace: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['channel_owner'], section: 'workspace' },
   { id: 'users-view', label: 'Users', href: '/users', icon: UserCog, roles: ['channel_owner'], section: 'workspace' },
   { id: 'channels', label: 'Channels', href: '/channels', icon: Radio, roles: ['channel_owner'], section: 'workspace' },
-  { id: 'teams', label: 'Teams', href: '/teams', icon: UsersRound, roles: ['channel_owner'], section: 'workspace' },
-  { id: 'sla-breaches', label: 'SLA Breaches', href: '/sla-breaches', icon: Clock, roles: ['channel_owner'], section: 'workspace' },
   { id: 'audit-log', label: 'Audit Log', href: '/audit-log', icon: ScrollText, roles: ['channel_owner'], section: 'workspace' },
 ]
 

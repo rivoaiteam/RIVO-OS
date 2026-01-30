@@ -422,6 +422,58 @@ def handle_lead_inbound_response(
     """
     from leads.services import LeadTrackingService
     from leads.models import LeadMessage
+    from campaigns.models import CampaignTemplate
+    from acquisition_channels.models import Channel, Source
+
+    # Check if lead already exists — always process existing leads
+    existing_lead = LeadTrackingService.find_lead_by_phone(from_number)
+
+    campaign_source_id = None
+
+    if not existing_lead:
+        # New lead — only accept if the message is a reply to a registered campaign template
+        matched_campaign = None
+        if context_message_id:
+            # Look up the original outbound message to get the template name
+            original_msg = LeadMessage.objects.filter(
+                ycloud_message_id=context_message_id
+            ).first()
+            if original_msg and original_msg.template_name:
+                campaign_tpl = CampaignTemplate.objects.filter(
+                    template_name=original_msg.template_name,
+                    campaign__is_active=True,
+                    campaign__name__startswith='Mortgage'
+                ).select_related('campaign').first()
+                if campaign_tpl:
+                    matched_campaign = campaign_tpl.campaign
+
+        if not matched_campaign:
+            logger.info(
+                f'Inbound message from {from_number} does not match any registered campaign, ignoring'
+            )
+            return Response(
+                {'status': 'ignored', 'reason': 'no matching campaign'},
+                status=status.HTTP_200_OK
+            )
+
+        logger.info(f'Matched campaign "{matched_campaign.name}" for new lead from {from_number}')
+
+        # Auto-create source under "WhatsApp" channel using the campaign name
+        if matched_campaign.source_id:
+            campaign_source_id = str(matched_campaign.source_id)
+        else:
+            whatsapp_channel, _ = Channel.objects.get_or_create(
+                name='WhatsApp',
+                defaults={'is_trusted': False}
+            )
+            source, _ = Source.objects.get_or_create(
+                channel=whatsapp_channel,
+                name=matched_campaign.name,
+            )
+            # Save the source back to the campaign for future use
+            matched_campaign.source = source
+            matched_campaign.save(update_fields=['source', 'updated_at'])
+            campaign_source_id = str(source.id)
 
     # Check for duplicate in lead messages
     if LeadMessage.objects.filter(ycloud_message_id=ycloud_message_id).exists():
@@ -438,6 +490,7 @@ def handle_lead_inbound_response(
             ycloud_message_id=ycloud_message_id,
             context_message_id=context_message_id,
             button_payload=button_payload,
+            campaign_source_id=campaign_source_id,
             metadata={'raw_payload': raw_payload}
         )
 

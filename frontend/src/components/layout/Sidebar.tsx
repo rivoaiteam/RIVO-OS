@@ -3,7 +3,6 @@ import { Settings, Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useLayout } from '@/contexts/LayoutContext'
 import { useNavigationItems } from '@/hooks/useNavigationItems'
-import { useSLABreachCount } from '@/hooks/useSLABreaches'
 import { useAuth } from '@/contexts/AuthContext'
 
 export function Sidebar() {
@@ -17,10 +16,6 @@ export function Sidebar() {
     isMobile,
   } = useLayout()
   const { sections, settingsItems } = useNavigationItems()
-
-  // Only fetch breach count for channel owners and admins (those with oversight)
-  const { data: breachCount } = useSLABreachCount()
-  const isOversightRole = user?.role === 'channel_owner' || user?.role === 'admin'
 
   const isActive = (href: string) => location.pathname === href || location.pathname.startsWith(href + '/')
 
@@ -87,8 +82,6 @@ export function Sidebar() {
                 {section.items.map(item => {
                   const Icon = item.icon
                   const active = isActive(item.href)
-                  // Show badge count for SLA Breaches if oversight role and has breaches
-                  const showBadge = isOversightRole && item.showBadge && breachCount && breachCount > 0
 
                   return (
                     <Link
@@ -107,30 +100,14 @@ export function Sidebar() {
                       {active && (
                         <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-[#1e3a5f] rounded-r" />
                       )}
-                      <div className="relative">
-                        <Icon
-                          className={cn(
-                            'h-[18px] w-[18px] shrink-0',
-                            active ? 'text-[#1e3a5f]' : 'text-gray-400',
-                            // Highlight icon in red/amber for SLA breaches if there are breaches
-                            showBadge && !active && 'text-red-500'
-                          )}
-                        />
-                        {/* Badge dot when sidebar is collapsed */}
-                        {sidebarCollapsed && !isMobile && showBadge && (
-                          <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                      <Icon
+                        className={cn(
+                          'h-[18px] w-[18px] shrink-0',
+                          active ? 'text-[#1e3a5f]' : 'text-gray-400'
                         )}
-                      </div>
+                      />
                       {(!sidebarCollapsed || isMobile) && (
-                        <>
-                          <span className="flex-1">{item.label}</span>
-                          {/* Badge count */}
-                          {showBadge && (
-                            <span className="ml-auto px-1.5 py-0.5 text-[10px] font-semibold bg-red-100 text-red-700 rounded">
-                              {breachCount > 99 ? '99+' : breachCount}
-                            </span>
-                          )}
-                        </>
+                        <span className="flex-1">{item.label}</span>
                       )}
                     </Link>
                   )

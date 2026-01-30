@@ -4,8 +4,8 @@
  * Includes tabs for Details, Documents, and Activity.
  */
 
-import { useState, useEffect, useMemo } from 'react'
-import { X, AlertCircle, Loader2, Briefcase } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, AlertCircle, Loader2, Briefcase, Lock } from 'lucide-react'
 import {
   useClient,
   useCreateClient,
@@ -190,6 +190,19 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
 
   const [saveError, setSaveError] = useState<string | null>(null)
   const [whatsAppError, setWhatsAppError] = useState<string | null>(null)
+
+  // Auto-dismiss errors after 5 seconds
+  useEffect(() => {
+    if (!saveError) return
+    const t = setTimeout(() => setSaveError(null), 3000)
+    return () => clearTimeout(t)
+  }, [saveError])
+
+  useEffect(() => {
+    if (!whatsAppError) return
+    const t = setTimeout(() => setWhatsAppError(null), 3000)
+    return () => clearTimeout(t)
+  }, [whatsAppError])
   const [showCaseCreation, setShowCaseCreation] = useState(false)
   const [_hasChanges, _setHasChanges] = useState(false)
   const [initialLoadDone, setInitialLoadDone] = useState(false)
@@ -311,51 +324,42 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
     setLiabilities(updated)
   }
 
-  // Calculations - DBR and Max Loan Amount only (LTV is calculated in Case)
-  const calculations = useMemo(() => {
-    const salary = parseFloat(monthlySalary) || 0
-    const addbacks = parseFloat(totalAddbacks) || 0
-    const coSalary = applicationType === 'joint' ? (parseFloat(coBorrowerSalary) || 0) : 0
-    const totalIncome = salary + addbacks + coSalary
+  // Calculations - DBR and Max Loan Amount (recomputed each render)
+  const salary = parseFloat(monthlySalary) || 0
+  const addbacks = parseFloat(totalAddbacks) || 0
+  const coSalary = applicationType === 'joint' ? (parseFloat(coBorrowerSalary) || 0) : 0
+  const totalIncome = salary + addbacks + coSalary
 
-    const ccLiability = liabilities
-      .filter(l => l.type === 'cc')
-      .reduce((sum, l) => sum + (parseFloat(l.amount) || 0) * 0.05, 0)
+  const ccLiability = liabilities
+    .filter(l => l.type === 'cc')
+    .reduce((sum, l) => sum + (parseFloat(l.amount) || 0) * 0.05, 0)
 
-    const loanEMIs = liabilities
-      .filter(l => l.type !== 'cc')
-      .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0)
+  const loanEMIs = liabilities
+    .filter(l => l.type !== 'cc')
+    .reduce((sum, l) => sum + (parseFloat(l.amount) || 0), 0)
 
-    const totalLiab = ccLiability + loanEMIs
-    const dbrPercentage = totalIncome > 0 ? (totalLiab / totalIncome) * 100 : 0
-    const maxLoanAmount = totalIncome * 68
+  const totalLiab = ccLiability + loanEMIs
+  const dbrPercentage = totalIncome > 0 ? (totalLiab / totalIncome) * 100 : 0
+  const maxLoanAmount = totalIncome * 68
 
-    return {
-      totalLiabilities: Math.round(totalLiab * 100) / 100,
-      dbrPercentage: Math.round(dbrPercentage * 100) / 100,
-      maxLoanAmount: Math.round(maxLoanAmount * 100) / 100,
-    }
-  }, [monthlySalary, totalAddbacks, coBorrowerSalary, applicationType, liabilities])
+  const calculations = {
+    totalLiabilities: Math.round(totalLiab * 100) / 100,
+    dbrPercentage: Math.round(dbrPercentage * 100) / 100,
+    maxLoanAmount: Math.round(maxLoanAmount * 100) / 100,
+  }
 
   // LTV Calculation
-  const ltvCalculation = useMemo(() => {
-    const loan = parseFloat(loanAmount) || 0
-    const property = parseFloat(propertyValue) || 0
+  const loan = parseFloat(loanAmount) || 0
+  const property = parseFloat(propertyValue) || 0
+  const ltvLimit = propertyType === 'off_plan' ? 50 : (isFirstProperty ? 80 : 65)
 
-    // Calculate LTV limit based on property type and first property status
-    const ltvLimit = propertyType === 'off_plan' ? 50 : (isFirstProperty ? 80 : 65)
-
-    if (property <= 0 || loan <= 0) {
-      return { ltv: 0, ltvLimit, withinLimit: true }
-    }
-
-    const ltv = (loan / property) * 100
-    return {
-      ltv: Math.round(ltv * 100) / 100,
-      ltvLimit,
-      withinLimit: ltv <= ltvLimit
-    }
-  }, [loanAmount, propertyValue, propertyType, isFirstProperty])
+  const ltvCalculation = (property <= 0 || loan <= 0)
+    ? { ltv: 0, ltvLimit, withinLimit: true }
+    : {
+        ltv: Math.round((loan / property) * 100 * 100) / 100,
+        ltvLimit,
+        withinLimit: (loan / property) * 100 <= ltvLimit,
+      }
 
   const handleSave = async () => {
     const errors: string[] = []
@@ -705,17 +709,19 @@ export function ClientSidePanel({ clientId, onClose, hideCreateCase, viewOnly: v
                   <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)}
                     className="w-full h-9 px-3 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
                 </FormField>
-                <FormField label="Phone *">
+                <FormField label={<span className="flex items-center gap-1">Phone *{!isCreateMode && client?.phone_locked && <Lock className="h-3 w-3 text-amber-500" title="Locked — WhatsApp messaging started" />}</span>}>
                   <div className="flex gap-1">
                     <select
                       value={phoneCountryCode}
                       onChange={(e) => setPhoneCountryCode(e.target.value)}
-                      className="h-9 px-1 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white w-20 shrink-0"
+                      disabled={!isCreateMode && client?.phone_locked}
+                      className="h-9 px-1 text-xs border border-gray-200 rounded-lg focus:outline-none bg-white w-20 shrink-0 disabled:bg-gray-50 disabled:text-gray-500"
                     >
                       {COUNTRY_CODES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                     <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
-                      className="flex-1 min-w-0 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]" />
+                      disabled={!isCreateMode && client?.phone_locked}
+                      className="flex-1 min-w-0 h-9 px-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1e3a5f] disabled:bg-gray-50 disabled:text-gray-500" />
                   </div>
                 </FormField>
                 <FormField label="Email *">

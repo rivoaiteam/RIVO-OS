@@ -130,6 +130,11 @@ class DocumentType(models.Model):
         help_text='Which applicant(s) this document applies to'
     )
 
+    max_files = models.PositiveIntegerField(
+        default=1,
+        help_text='Maximum number of files allowed for this document type'
+    )
+
     display_order = models.PositiveIntegerField(
         default=0,
         help_text='Order for displaying in checklists'

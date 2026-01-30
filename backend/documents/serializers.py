@@ -35,6 +35,7 @@ class DocumentTypeSerializer(serializers.ModelSerializer):
             'required',
             'description',
             'applicant_type',
+            'max_files',
             'display_order',
             'is_system',
             'client',
@@ -271,18 +272,19 @@ class DocumentChecklistItemSerializer(serializers.Serializer):
     Combines document type with upload status and document details.
     """
     document_type = DocumentTypeSerializer()
-    document = serializers.SerializerMethodField()
-    is_uploaded = serializers.BooleanField()
+    documents = serializers.SerializerMethodField()
+    uploaded_count = serializers.IntegerField()
 
-    def get_document(self, obj):
-        """Return document details if uploaded."""
-        doc = obj.get('document')
-        if doc:
+    def get_documents(self, obj):
+        """Return list of document details if any uploaded."""
+        docs = obj.get('documents', [])
+        result = []
+        for doc in docs:
             if hasattr(doc, 'client'):
-                return ClientDocumentSerializer(doc).data
+                result.append(ClientDocumentSerializer(doc).data)
             elif hasattr(doc, 'case'):
-                return CaseDocumentSerializer(doc).data
-        return None
+                result.append(CaseDocumentSerializer(doc).data)
+        return result
 
 
 class ClientDocumentChecklistSerializer(serializers.Serializer):

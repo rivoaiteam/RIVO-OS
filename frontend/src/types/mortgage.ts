@@ -361,6 +361,8 @@ export interface ClientData {
     name: string
     email: string
   } | null
+  // Phone lock
+  phone_locked?: boolean
   // Cases linked to this client
   cases: ClientCaseSummary[] | null
   // Timestamps

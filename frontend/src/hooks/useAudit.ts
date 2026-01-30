@@ -114,12 +114,13 @@ export function useDeleteNote() {
 /**
  * Hook for fetching dashboard reminders (due today or overdue).
  */
-export function useDashboardReminders() {
+export function useDashboardReminders(enabled = true) {
   return useQuery({
     queryKey: ['dashboard-reminders'],
     queryFn: async (): Promise<DashboardReminder[]> => {
       return await api.get<DashboardReminder[]>('/dashboard/reminders/')
     },
+    enabled,
   })
 }
 

@@ -32,6 +32,7 @@ export interface DocumentType {
   applicant_type: ApplicantType
   display_order: number
   is_system: boolean
+  max_files: number
   client: string | null  // Client ID for custom client-specific document types
   created_at: string
   updated_at: string
@@ -104,8 +105,8 @@ export interface CreateCaseDocumentData {
 
 export interface DocumentChecklistItem {
   document_type: DocumentType
-  document: ClientDocument | CaseDocument | null
-  is_uploaded: boolean
+  documents: (ClientDocument | CaseDocument)[]
+  uploaded_count: number
 }
 
 export interface DocumentChecklistResponse {

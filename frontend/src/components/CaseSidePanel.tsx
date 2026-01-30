@@ -144,14 +144,16 @@ function BankDropdown({ value, onChange, banks, disabled }: BankDropdownProps) {
         {selectedBank ? (
           <span className="flex items-center gap-2">
             <div className="h-5 w-5 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-              <img
-                src={selectedBank.icon}
-                alt=""
-                className="h-4 w-4 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
-                }}
-              />
+              {selectedBank.icon && (
+                <img
+                  src={selectedBank.icon}
+                  alt=""
+                  className="h-4 w-4 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              )}
             </div>
             <span className="text-gray-900">{selectedBank.name}</span>
           </span>
@@ -174,14 +176,16 @@ function BankDropdown({ value, onChange, banks, disabled }: BankDropdownProps) {
               )}
             >
               <div className="h-6 w-6 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                <img
-                  src={bank.icon}
-                  alt=""
-                  className="h-5 w-5 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
-                />
+                {bank.icon && (
+                  <img
+                    src={bank.icon}
+                    alt=""
+                    className="h-5 w-5 object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                )}
               </div>
               <span className="text-gray-900">{bank.name}</span>
             </button>
@@ -213,6 +217,13 @@ function CreateCaseContent({ onClose, preselectedClientId }: CreateCaseContentPr
 
   const [saveError, setSaveError] = useState<string | null>(null)
   const formRef = useRef<HTMLDivElement>(null)
+
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (!saveError) return
+    const t = setTimeout(() => setSaveError(null), 3000)
+    return () => clearTimeout(t)
+  }, [saveError])
 
   const { data: clientsData } = useClients({ page_size: 100, status: 'active' })
   const { data: selectedClientData } = useClient(selectedClientId)
@@ -467,6 +478,13 @@ function EditCaseContent({ caseData, onClose }: { caseData: CaseData; onClose: (
 
   const [saveError, setSaveError] = useState<string | null>(null)
   const [_hasChanges, _setHasChanges] = useState(false)
+
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (!saveError) return
+    const t = setTimeout(() => setSaveError(null), 3000)
+    return () => clearTimeout(t)
+  }, [saveError])
 
   const { data: banks } = useBanks()
   const updateMutation = useUpdateCase()
