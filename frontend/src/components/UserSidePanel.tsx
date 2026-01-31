@@ -22,7 +22,6 @@ interface UserSidePanelProps {
 const roleOptions: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'channel_owner', label: 'Channel Owner' },
-  { value: 'team_leader', label: 'Team Leader' },
   { value: 'mortgage_specialist', label: 'Mortgage Specialist' },
   { value: 'process_officer', label: 'Process Executive' },
 ]

@@ -163,7 +163,6 @@ export function UsersPage() {
             <option value="all">All Roles</option>
             <option value="admin">Admin</option>
             <option value="channel_owner">Channel Owner</option>
-            <option value="team_leader">Team Leader</option>
             <option value="mortgage_specialist">Mortgage Specialist</option>
             <option value="process_officer">Process Executive</option>
           </select>
